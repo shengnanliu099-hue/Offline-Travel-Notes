@@ -26,6 +26,8 @@ sealed interface DraftImage {
 class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val repository = NoteRepository(application.applicationContext)
     private var draftImageCounter: Long = 0
+    var isComposerVisible by mutableStateOf(false)
+        private set
 
     var titleInput by mutableStateOf("")
         private set
@@ -63,6 +65,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun onSearchChange(value: String) {
         searchInput = value
         refreshNotes()
+    }
+
+    fun startCreate() {
+        clearEditor()
+        isComposerVisible = true
     }
 
     fun addPickedImages(uris: List<Uri>) {
@@ -104,10 +111,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 path = path
             )
         }
+        isComposerVisible = true
     }
 
     fun cancelEdit() {
         clearEditor()
+        isComposerVisible = false
     }
 
     fun saveNote() {
@@ -140,6 +149,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
 
         clearEditor()
+        isComposerVisible = false
         refreshNotes()
     }
 
@@ -147,6 +157,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         repository.deleteNote(note)
         if (editingNoteId == note.id) {
             clearEditor()
+            isComposerVisible = false
         }
         refreshNotes()
     }

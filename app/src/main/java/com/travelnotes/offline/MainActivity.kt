@@ -9,13 +9,20 @@ import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -32,8 +39,11 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.AddPhotoAlternate
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.DeleteOutline
@@ -44,6 +54,8 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.FabPosition
+import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -66,13 +78,19 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -99,11 +117,15 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 private fun TravelNotesScreen(viewModel: MainViewModel = viewModel()) {
+    val focusManager = LocalFocusManager.current
     val pickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.PickMultipleVisualMedia(MainViewModel.MAX_IMAGES_PER_NOTE)
     ) { uris: List<Uri> ->
         viewModel.addPickedImages(uris)
     }
+
+    var openedNoteId by remember { mutableStateOf<Long?>(null) }
+    val openedNote = viewModel.notes.firstOrNull { it.id == openedNoteId }
 
     Box(
         modifier = Modifier
@@ -115,7 +137,23 @@ private fun TravelNotesScreen(viewModel: MainViewModel = viewModel()) {
             )
     ) {
         Scaffold(
-            containerColor = Color.Transparent
+            containerColor = Color.Transparent,
+            floatingActionButtonPosition = FabPosition.End,
+            floatingActionButton = {
+                FloatingActionButton(
+                    onClick = {
+                        openedNoteId = null
+                        viewModel.startCreate()
+                    },
+                    containerColor = Color(0xFFEDF2F8),
+                    contentColor = Color.Black
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Add,
+                        contentDescription = stringResource(R.string.cd_add_note)
+                    )
+                }
+            }
         ) { padding ->
             LazyColumn(
                 modifier = Modifier
@@ -133,6 +171,14 @@ private fun TravelNotesScreen(viewModel: MainViewModel = viewModel()) {
                         value = viewModel.searchInput,
                         onValueChange = viewModel::onSearchChange,
                         label = { Text(stringResource(R.string.search_hint)) },
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                        keyboardActions = KeyboardActions(
+                            onSearch = {
+                                viewModel.onSearchChange(viewModel.searchInput)
+                                focusManager.clearFocus()
+                            }
+                        ),
                         leadingIcon = {
                             Icon(
                                 imageVector = Icons.Default.Search,
@@ -145,43 +191,60 @@ private fun TravelNotesScreen(viewModel: MainViewModel = viewModel()) {
                 }
 
                 item {
-                    EditorCard(
-                        isEditing = viewModel.isEditing,
-                        title = viewModel.titleInput,
-                        content = viewModel.contentInput,
-                        images = viewModel.draftImages,
-                        onTitleChange = viewModel::onTitleChange,
-                        onContentChange = viewModel::onContentChange,
-                        onPickImages = {
-                            pickerLauncher.launch(
-                                PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
-                            )
-                        },
-                        onRemoveImage = viewModel::removeDraftImage,
-                        onMoveImage = viewModel::moveDraftImage,
-                        onSave = viewModel::saveNote,
-                        onCancelEdit = viewModel::cancelEdit
-                    )
-                }
-
-                item {
                     HorizontalDivider(color = Color(0xFF2B2C30))
                 }
 
-                itemsIndexed(viewModel.notes, key = { _, note -> note.id }) { index, note ->
-                    AnimatedNoteItem(
-                        index = index,
-                        note = note,
-                        onEdit = { viewModel.startEdit(note) },
-                        onDelete = { viewModel.deleteNote(note) }
-                    )
+                if (viewModel.notes.isEmpty()) {
+                    item {
+                        EmptyStateCard()
+                    }
+                } else {
+                    itemsIndexed(viewModel.notes, key = { _, note -> note.id }) { index, note ->
+                        AnimatedNoteItem(
+                            index = index,
+                            note = note,
+                            onOpen = { openedNoteId = note.id }
+                        )
+                    }
                 }
 
                 item {
-                    Spacer(modifier = Modifier.height(30.dp))
+                    Spacer(modifier = Modifier.height(60.dp))
                 }
             }
         }
+
+        NoteDetailOverlay(
+            note = openedNote,
+            onDismiss = { openedNoteId = null },
+            onEdit = {
+                openedNoteId = null
+                viewModel.startEdit(it)
+            },
+            onDelete = {
+                openedNoteId = null
+                viewModel.deleteNote(it)
+            }
+        )
+
+        EditorOverlay(
+            visible = viewModel.isComposerVisible,
+            isEditing = viewModel.isEditing,
+            title = viewModel.titleInput,
+            content = viewModel.contentInput,
+            images = viewModel.draftImages,
+            onTitleChange = viewModel::onTitleChange,
+            onContentChange = viewModel::onContentChange,
+            onPickImages = {
+                pickerLauncher.launch(
+                    PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                )
+            },
+            onRemoveImage = viewModel::removeDraftImage,
+            onMoveImage = viewModel::moveDraftImage,
+            onSave = viewModel::saveNote,
+            onDismiss = viewModel::cancelEdit
+        )
     }
 }
 
@@ -215,6 +278,266 @@ private fun HeaderSection() {
 }
 
 @Composable
+private fun EmptyStateCard() {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(18.dp),
+        colors = CardDefaults.cardColors(containerColor = Color(0xFF111316))
+    ) {
+        Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 20.dp)) {
+            Text(
+                text = stringResource(R.string.empty_notes_title),
+                color = Color.White,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold
+            )
+            Spacer(modifier = Modifier.height(6.dp))
+            Text(
+                text = stringResource(R.string.empty_notes_hint),
+                color = Color(0xFFA6ADBA),
+                style = MaterialTheme.typography.bodyMedium
+            )
+        }
+    }
+}
+
+@Composable
+private fun EditorOverlay(
+    visible: Boolean,
+    isEditing: Boolean,
+    title: String,
+    content: String,
+    images: List<DraftImage>,
+    onTitleChange: (String) -> Unit,
+    onContentChange: (String) -> Unit,
+    onPickImages: () -> Unit,
+    onRemoveImage: (DraftImage) -> Unit,
+    onMoveImage: (Int, Int) -> Unit,
+    onSave: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    val interactionSource = remember { MutableInteractionSource() }
+
+    AnimatedVisibility(
+        visible = visible,
+        enter = fadeIn(tween(220)) + scaleIn(tween(220), initialScale = 0.96f),
+        exit = fadeOut(tween(180)) + scaleOut(tween(180), targetScale = 0.96f)
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color.Black.copy(alpha = 0.64f))
+                .clickable(
+                    interactionSource = interactionSource,
+                    indication = null,
+                    onClick = onDismiss
+                ),
+            contentAlignment = Alignment.Center
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp)
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null,
+                        onClick = {}
+                    )
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 8.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = if (isEditing) {
+                            stringResource(R.string.overlay_edit_title)
+                        } else {
+                            stringResource(R.string.overlay_create_title)
+                        },
+                        color = Color.White,
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    IconButton(onClick = onDismiss) {
+                        Icon(
+                            imageVector = Icons.Default.Close,
+                            contentDescription = stringResource(R.string.cd_close),
+                            tint = Color.White
+                        )
+                    }
+                }
+
+                EditorCard(
+                    isEditing = isEditing,
+                    title = title,
+                    content = content,
+                    images = images,
+                    onTitleChange = onTitleChange,
+                    onContentChange = onContentChange,
+                    onPickImages = onPickImages,
+                    onRemoveImage = onRemoveImage,
+                    onMoveImage = onMoveImage,
+                    onSave = onSave,
+                    onCancel = onDismiss
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun NoteDetailOverlay(
+    note: Note?,
+    onDismiss: () -> Unit,
+    onEdit: (Note) -> Unit,
+    onDelete: (Note) -> Unit
+) {
+    val currentNote = note ?: return
+    val interactionSource = remember { MutableInteractionSource() }
+
+    AnimatedVisibility(
+        visible = true,
+        enter = fadeIn(tween(220)) + scaleIn(tween(220), initialScale = 0.95f),
+        exit = fadeOut(tween(180)) + scaleOut(tween(180), targetScale = 0.95f)
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color.Black.copy(alpha = 0.62f))
+                .clickable(
+                    interactionSource = interactionSource,
+                    indication = null,
+                    onClick = onDismiss
+                ),
+            contentAlignment = Alignment.Center
+        ) {
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp)
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null,
+                        onClick = {}
+                    ),
+                shape = RoundedCornerShape(22.dp),
+                colors = CardDefaults.cardColors(containerColor = Color(0xFF111317))
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp)
+                        .verticalScroll(rememberScrollState())
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.Top
+                    ) {
+                        Text(
+                            text = if (currentNote.title.isBlank()) {
+                                stringResource(R.string.untitled_note)
+                            } else {
+                                currentNote.title
+                            },
+                            color = Color.White,
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.weight(1f)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        IconButton(onClick = onDismiss) {
+                            Icon(
+                                imageVector = Icons.Default.Close,
+                                contentDescription = stringResource(R.string.cd_close),
+                                tint = Color.White
+                            )
+                        }
+                    }
+
+                    Text(
+                        text = formatTime(currentNote.updatedAt),
+                        color = Color(0xFF98A0AE),
+                        style = MaterialTheme.typography.bodySmall
+                    )
+
+                    if (currentNote.content.isNotBlank()) {
+                        Spacer(modifier = Modifier.height(10.dp))
+                        Text(
+                            text = currentNote.content,
+                            color = Color(0xFFE5E8EE),
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                    }
+
+                    if (currentNote.imagePaths.isNotEmpty()) {
+                        Spacer(modifier = Modifier.height(12.dp))
+                        LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            items(currentNote.imagePaths) { path ->
+                                val file = File(path)
+                                if (file.exists()) {
+                                    AsyncImage(
+                                        model = file,
+                                        contentDescription = stringResource(R.string.cd_note_photo),
+                                        modifier = Modifier
+                                            .size(width = 180.dp, height = 120.dp)
+                                            .clip(RoundedCornerShape(14.dp))
+                                            .background(Color(0xFF1D2024)),
+                                        contentScale = ContentScale.Crop
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    if (currentNote.tags.isNotEmpty()) {
+                        Spacer(modifier = Modifier.height(10.dp))
+                        Text(
+                            text = currentNote.tags.joinToString(separator = "  ") { "#$it" },
+                            color = Color(0xFF5CB9FF),
+                            style = MaterialTheme.typography.bodySmall,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(12.dp))
+                    HorizontalDivider(color = Color(0xFF2B2E34))
+                    Spacer(modifier = Modifier.height(6.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.End,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        TextButton(onClick = { onEdit(currentNote) }) {
+                            Icon(
+                                imageVector = Icons.Default.Edit,
+                                contentDescription = stringResource(R.string.cd_edit),
+                                tint = Color(0xFFCFD5DF)
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(stringResource(R.string.btn_edit), color = Color(0xFFCFD5DF))
+                        }
+                        TextButton(onClick = { onDelete(currentNote) }) {
+                            Icon(
+                                imageVector = Icons.Default.DeleteOutline,
+                                contentDescription = stringResource(R.string.cd_delete),
+                                tint = Color(0xFFFF8A8A)
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(stringResource(R.string.btn_delete), color = Color(0xFFFF8A8A))
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
 private fun EditorCard(
     isEditing: Boolean,
     title: String,
@@ -226,7 +549,7 @@ private fun EditorCard(
     onRemoveImage: (DraftImage) -> Unit,
     onMoveImage: (Int, Int) -> Unit,
     onSave: () -> Unit,
-    onCancelEdit: () -> Unit
+    onCancel: () -> Unit
 ) {
     Card(
         modifier = Modifier
@@ -314,10 +637,8 @@ private fun EditorCard(
                 }
 
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    AnimatedVisibility(visible = isEditing) {
-                        TextButton(onClick = onCancelEdit) {
-                            Text(stringResource(R.string.btn_cancel), color = Color(0xFFB8C0CC))
-                        }
+                    TextButton(onClick = onCancel) {
+                        Text(stringResource(R.string.btn_cancel), color = Color(0xFFB8C0CC))
                     }
 
                     Button(
@@ -350,37 +671,74 @@ private fun DraftImagesRow(
     onMoveImage: (Int, Int) -> Unit
 ) {
     val density = LocalDensity.current
-    val reorderStepPx = with(density) { 44.dp.toPx() }
+    val reorderStepPx = with(density) { 88.dp.toPx() }
+
+    var draggedImageId by remember { mutableStateOf<String?>(null) }
     var dragDistanceX by remember { mutableFloatStateOf(0f) }
 
     LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        itemsIndexed(items = images, key = { _, image -> image.id }) { index, image ->
+        itemsIndexed(items = images, key = { _, image -> image.id }) { _, image ->
+            val isDragging = draggedImageId == image.id
+            val animatedScale by animateFloatAsState(
+                targetValue = if (isDragging) 1.08f else 1f,
+                animationSpec = tween(180),
+                label = "drag-scale"
+            )
+            val animatedElevation by animateDpAsState(
+                targetValue = if (isDragging) 12.dp else 0.dp,
+                animationSpec = tween(180),
+                label = "drag-elevation"
+            )
+            val borderAlpha by animateFloatAsState(
+                targetValue = if (isDragging) 1f else 0f,
+                animationSpec = tween(180),
+                label = "drag-border"
+            )
+
             Box(
                 modifier = Modifier
+                    .graphicsLayer {
+                        translationX = if (isDragging) dragDistanceX else 0f
+                        scaleX = animatedScale
+                        scaleY = animatedScale
+                    }
+                    .shadow(animatedElevation, RoundedCornerShape(14.dp))
                     .size(98.dp)
                     .clip(RoundedCornerShape(14.dp))
                     .background(Color(0xFF1A1D20))
-                    .pointerInput(index, images.size, image.id) {
+                    .border(
+                        width = 1.dp,
+                        color = Color(0xFF5CB9FF).copy(alpha = borderAlpha),
+                        shape = RoundedCornerShape(14.dp)
+                    )
+                    .pointerInput(image.id, images) {
                         detectDragGesturesAfterLongPress(
                             onDragStart = {
+                                draggedImageId = image.id
                                 dragDistanceX = 0f
                             },
                             onDragEnd = {
+                                draggedImageId = null
                                 dragDistanceX = 0f
                             },
                             onDragCancel = {
+                                draggedImageId = null
                                 dragDistanceX = 0f
                             }
                         ) { change, dragAmount ->
                             change.consume()
-                            dragDistanceX += dragAmount.x
+                            if (draggedImageId != image.id) return@detectDragGesturesAfterLongPress
 
-                            if (dragDistanceX >= reorderStepPx && index < images.lastIndex) {
-                                onMoveImage(index, index + 1)
-                                dragDistanceX = 0f
-                            } else if (dragDistanceX <= -reorderStepPx && index > 0) {
-                                onMoveImage(index, index - 1)
-                                dragDistanceX = 0f
+                            dragDistanceX += dragAmount.x
+                            val currentIndex = images.indexOfFirst { it.id == image.id }
+                            if (currentIndex == -1) return@detectDragGesturesAfterLongPress
+
+                            if (dragDistanceX >= reorderStepPx && currentIndex < images.lastIndex) {
+                                onMoveImage(currentIndex, currentIndex + 1)
+                                dragDistanceX -= reorderStepPx
+                            } else if (dragDistanceX <= -reorderStepPx && currentIndex > 0) {
+                                onMoveImage(currentIndex, currentIndex - 1)
+                                dragDistanceX += reorderStepPx
                             }
                         }
                     }
@@ -414,8 +772,7 @@ private fun DraftImagesRow(
 private fun AnimatedNoteItem(
     index: Int,
     note: Note,
-    onEdit: () -> Unit,
-    onDelete: () -> Unit
+    onOpen: () -> Unit
 ) {
     var visible by remember(note.id) { mutableStateOf(false) }
 
@@ -429,14 +786,16 @@ private fun AnimatedNoteItem(
         enter = fadeIn(tween(300)) + slideInVertically(tween(300)) { it / 7 },
         exit = fadeOut(tween(180))
     ) {
-        NoteCard(note = note, onEdit = onEdit, onDelete = onDelete)
+        NoteListCard(note = note, onOpen = onOpen)
     }
 }
 
 @Composable
-private fun NoteCard(note: Note, onEdit: () -> Unit, onDelete: () -> Unit) {
+private fun NoteListCard(note: Note, onOpen: () -> Unit) {
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onOpen),
         shape = RoundedCornerShape(18.dp),
         colors = CardDefaults.cardColors(containerColor = Color(0xFF111316))
     ) {
@@ -451,6 +810,8 @@ private fun NoteCard(note: Note, onEdit: () -> Unit, onDelete: () -> Unit) {
                     color = Color.White,
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.weight(1f)
                 )
                 Spacer(modifier = Modifier.width(8.dp))
@@ -462,26 +823,28 @@ private fun NoteCard(note: Note, onEdit: () -> Unit, onDelete: () -> Unit) {
             }
 
             if (note.content.isNotBlank()) {
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(6.dp))
                 Text(
                     text = note.content,
-                    color = Color(0xFFE5E8EE),
-                    style = MaterialTheme.typography.bodyMedium
+                    color = Color(0xFFC9CFDA),
+                    style = MaterialTheme.typography.bodyMedium,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
                 )
             }
 
             if (note.imagePaths.isNotEmpty()) {
-                Spacer(modifier = Modifier.height(10.dp))
-                LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    items(note.imagePaths) { path ->
+                Spacer(modifier = Modifier.height(8.dp))
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    items(note.imagePaths.take(3)) { path ->
                         val file = File(path)
                         if (file.exists()) {
                             AsyncImage(
                                 model = file,
                                 contentDescription = stringResource(R.string.cd_note_photo),
                                 modifier = Modifier
-                                    .size(width = 140.dp, height = 96.dp)
-                                    .clip(RoundedCornerShape(12.dp))
+                                    .size(width = 74.dp, height = 54.dp)
+                                    .clip(RoundedCornerShape(10.dp))
                                     .background(Color(0xFF1C1F24)),
                                 contentScale = ContentScale.Crop
                             )
@@ -491,40 +854,23 @@ private fun NoteCard(note: Note, onEdit: () -> Unit, onDelete: () -> Unit) {
             }
 
             if (note.tags.isNotEmpty()) {
-                Spacer(modifier = Modifier.height(10.dp))
+                Spacer(modifier = Modifier.height(8.dp))
                 Text(
                     text = note.tags.joinToString(separator = "  ") { "#$it" },
                     color = Color(0xFF5CB9FF),
                     style = MaterialTheme.typography.bodySmall,
-                    fontWeight = FontWeight.SemiBold
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
                 )
             }
 
             Spacer(modifier = Modifier.height(8.dp))
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.End,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                TextButton(onClick = onEdit) {
-                    Icon(
-                        imageVector = Icons.Default.Edit,
-                        contentDescription = stringResource(R.string.cd_edit),
-                        tint = Color(0xFFCFD5DF)
-                    )
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text(stringResource(R.string.btn_edit), color = Color(0xFFCFD5DF))
-                }
-                TextButton(onClick = onDelete) {
-                    Icon(
-                        imageVector = Icons.Default.DeleteOutline,
-                        contentDescription = stringResource(R.string.cd_delete),
-                        tint = Color(0xFFFF8A8A)
-                    )
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text(stringResource(R.string.btn_delete), color = Color(0xFFFF8A8A))
-                }
-            }
+            Text(
+                text = stringResource(R.string.hint_tap_to_open),
+                color = Color(0xFF8E96A3),
+                style = MaterialTheme.typography.bodySmall
+            )
         }
     }
 }
