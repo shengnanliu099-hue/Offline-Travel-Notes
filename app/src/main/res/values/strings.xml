@@ -1,0 +1,31 @@
+<resources>
+    <string name="app_name">Travel Notes</string>
+    <string name="header_title">Travel Notes</string>
+    <string name="header_subtitle">Offline journal · Multi-image · #Tag Search</string>
+    <string name="search_hint">Search by #tag or keyword</string>
+    <string name="cd_search">Search</string>
+
+    <string name="editor_new_title">New Note</string>
+    <string name="editor_editing_title">Edit Note</string>
+    <string name="editor_editing_notice">You are editing an existing note</string>
+    <string name="label_title">Title</string>
+    <string name="label_content_with_hint">Content (example: #travel #tokyo)</string>
+    <string name="hint_drag_to_sort">Long-press and drag images to reorder</string>
+
+    <string name="cd_pick_photos">Pick photos</string>
+    <string name="btn_add_photos">Add Photos</string>
+    <string name="btn_cancel">Cancel</string>
+    <string name="cd_save">Save</string>
+    <string name="btn_save">Save</string>
+    <string name="btn_update">Update</string>
+
+    <string name="cd_draft_image">Draft image</string>
+    <string name="cd_remove_image">Remove image</string>
+    <string name="untitled_note">Untitled Note</string>
+    <string name="cd_note_photo">Note photo</string>
+
+    <string name="cd_edit">Edit</string>
+    <string name="btn_edit">Edit</string>
+    <string name="cd_delete">Delete</string>
+    <string name="btn_delete">Delete</string>
+</resources>

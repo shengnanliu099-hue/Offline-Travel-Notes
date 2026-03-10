@@ -1,0 +1,31 @@
+<resources>
+    <string name="app_name">离线手帐</string>
+    <string name="header_title">离线手帐</string>
+    <string name="header_subtitle">离线记录 · 多图笔记 · #标签搜索</string>
+    <string name="search_hint">搜索 #标签 或关键词</string>
+    <string name="cd_search">搜索</string>
+
+    <string name="editor_new_title">新建笔记</string>
+    <string name="editor_editing_title">编辑笔记</string>
+    <string name="editor_editing_notice">你正在编辑已有笔记</string>
+    <string name="label_title">标题</string>
+    <string name="label_content_with_hint">内容（示例：#旅行 #东京）</string>
+    <string name="hint_drag_to_sort">长按图片并拖拽可排序</string>
+
+    <string name="cd_pick_photos">选择图片</string>
+    <string name="btn_add_photos">添加相册图片</string>
+    <string name="btn_cancel">取消</string>
+    <string name="cd_save">保存</string>
+    <string name="btn_save">保存</string>
+    <string name="btn_update">更新</string>
+
+    <string name="cd_draft_image">草稿图片</string>
+    <string name="cd_remove_image">移除图片</string>
+    <string name="untitled_note">未命名笔记</string>
+    <string name="cd_note_photo">笔记图片</string>
+
+    <string name="cd_edit">编辑</string>
+    <string name="btn_edit">编辑</string>
+    <string name="cd_delete">删除</string>
+    <string name="btn_delete">删除</string>
+</resources>
