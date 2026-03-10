@@ -1,27 +1,28 @@
-# 离线手帐 Android App
+# Offline Travel Notes Android App
 
-已实现功能：
-- 离线本地存储（SQLite）
-- 新建笔记（标题 + 内容）
-- 每条笔记支持多张图片（最多 9 张）
-- 编辑区支持长按图片拖拽排序
-- 选择后的图片复制到 App 私有目录，离线可查看
-- 自动提取 `#标签`
-- 支持按 `#标签` 或关键词搜索
-- 支持编辑笔记（标题/内容/图片）
-- 支持删除笔记（同时清理本地图片文件）
-- 黑色极简风格（接近 X）+ 笔记卡片入场动画
+## Features
+- Fully offline local storage (SQLite)
+- Create notes with title and content
+- Up to 9 photos per note
+- Long-press and drag photos to reorder in the editor
+- Selected photos are copied into app private storage for offline viewing
+- Automatic `#tag` extraction
+- Search by `#tag` or keyword
+- Edit notes (title/content/photos)
+- Delete notes (also cleans local image files)
+- Dark minimal UI inspired by X, with note card entrance animation
+- UI text follows system language (Chinese/English)
 
-## 打开方式
-1. 用 Android Studio 打开当前目录
-2. 等待 Gradle Sync
-3. 运行到模拟器或真机
+## Open and Run
+1. Open this folder in Android Studio.
+2. Wait for Gradle Sync to complete.
+3. Run the app on an emulator or a physical Android device.
 
-## 使用说明
-- 在内容中输入标签格式：`#东京 #旅行`
-- 搜索框输入：
-  - `#东京`：标签精确搜索
-  - `东京`：全文关键词搜索（标题/内容/标签）
-- 点击笔记卡片的“编辑”进入编辑模式
-- 编辑模式下可删除原有图片、追加新图片，然后“更新”保存
-- 编辑模式下可长按图片左右拖拽调整顺序
+## Usage
+- Add tags in content, for example: `#tokyo #travel`
+- In the search box:
+  - `#tokyo`: exact tag search
+  - `tokyo`: keyword search across title/content/tags
+- Tap **Edit** on a note card to enter edit mode.
+- In edit mode, you can remove existing images, add new images, and tap **Update**.
+- In edit mode, long-press an image and drag left/right to reorder.
