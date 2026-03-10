@@ -24,6 +24,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -37,7 +38,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -119,7 +119,7 @@ class MainActivity : ComponentActivity() {
 private fun TravelNotesScreen(viewModel: MainViewModel = viewModel()) {
     val focusManager = LocalFocusManager.current
     val pickerLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.PickMultipleVisualMedia(MainViewModel.MAX_IMAGES_PER_NOTE)
+        contract = ActivityResultContracts.PickMultipleVisualMedia(MainViewModel.MAX_IMAGE_PICKER_SELECTION)
     ) { uris: List<Uri> ->
         viewModel.addPickedImages(uris)
     }
@@ -475,22 +475,10 @@ private fun NoteDetailOverlay(
 
                     if (currentNote.imagePaths.isNotEmpty()) {
                         Spacer(modifier = Modifier.height(12.dp))
-                        LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            items(currentNote.imagePaths) { path ->
-                                val file = File(path)
-                                if (file.exists()) {
-                                    AsyncImage(
-                                        model = file,
-                                        contentDescription = stringResource(R.string.cd_note_photo),
-                                        modifier = Modifier
-                                            .size(width = 180.dp, height = 120.dp)
-                                            .clip(RoundedCornerShape(14.dp))
-                                            .background(Color(0xFF1D2024)),
-                                        contentScale = ContentScale.Crop
-                                    )
-                                }
-                            }
-                        }
+                        NoteImagesMosaic(
+                            imagePaths = currentNote.imagePaths,
+                            maxPreview = Int.MAX_VALUE
+                        )
                     }
 
                     if (currentNote.tags.isNotEmpty()) {
@@ -822,7 +810,7 @@ private fun NoteListCard(note: Note, onOpen: () -> Unit) {
             }
 
             if (note.content.isNotBlank()) {
-                Spacer(modifier = Modifier.height(6.dp))
+                Spacer(modifier = Modifier.height(10.dp))
                 Text(
                     text = note.content,
                     color = Color(0xFFC9CFDA),
@@ -834,22 +822,10 @@ private fun NoteListCard(note: Note, onOpen: () -> Unit) {
 
             if (note.imagePaths.isNotEmpty()) {
                 Spacer(modifier = Modifier.height(8.dp))
-                LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    items(note.imagePaths.take(3)) { path ->
-                        val file = File(path)
-                        if (file.exists()) {
-                            AsyncImage(
-                                model = file,
-                                contentDescription = stringResource(R.string.cd_note_photo),
-                                modifier = Modifier
-                                    .size(width = 74.dp, height = 54.dp)
-                                    .clip(RoundedCornerShape(10.dp))
-                                    .background(Color(0xFF1C1F24)),
-                                contentScale = ContentScale.Crop
-                            )
-                        }
-                    }
-                }
+                NoteImagesMosaic(
+                    imagePaths = note.imagePaths,
+                    maxPreview = 9
+                )
             }
 
             if (note.tags.isNotEmpty()) {
@@ -864,6 +840,135 @@ private fun NoteListCard(note: Note, onOpen: () -> Unit) {
                 )
             }
 
+        }
+    }
+}
+
+@Composable
+private fun NoteImagesMosaic(imagePaths: List<String>, maxPreview: Int) {
+    val visiblePaths = if (maxPreview == Int.MAX_VALUE) imagePaths else imagePaths.take(maxPreview)
+    if (visiblePaths.isEmpty()) return
+
+    when (visiblePaths.size) {
+        1 -> {
+            MosaicImageCell(
+                path = visiblePaths[0],
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(188.dp)
+            )
+        }
+        2 -> {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                MosaicImageCell(
+                    path = visiblePaths[0],
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(128.dp)
+                )
+                MosaicImageCell(
+                    path = visiblePaths[1],
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(128.dp)
+                )
+            }
+        }
+        3 -> {
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    MosaicImageCell(
+                        path = visiblePaths[0],
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(94.dp)
+                    )
+                    MosaicImageCell(
+                        path = visiblePaths[1],
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(94.dp)
+                    )
+                }
+                MosaicImageCell(
+                    path = visiblePaths[2],
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(128.dp)
+                )
+            }
+        }
+        4 -> {
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                repeat(2) { rowIndex ->
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        repeat(2) { col ->
+                            val index = rowIndex * 2 + col
+                            MosaicImageCell(
+                                path = visiblePaths[index],
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .height(98.dp)
+                            )
+                        }
+                    }
+                }
+            }
+        }
+        else -> {
+            val rows = visiblePaths.chunked(3)
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                rows.forEach { rowPaths ->
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        rowPaths.forEach { path ->
+                            MosaicImageCell(
+                                path = path,
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .aspectRatio(1f)
+                            )
+                        }
+                        repeat(3 - rowPaths.size) {
+                            Spacer(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .aspectRatio(1f)
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun MosaicImageCell(path: String, modifier: Modifier) {
+    val file = File(path)
+    Box(
+        modifier = modifier
+            .clip(RoundedCornerShape(12.dp))
+            .background(Color(0xFF1C1F24))
+    ) {
+        if (file.exists()) {
+            AsyncImage(
+                model = file,
+                contentDescription = stringResource(R.string.cd_note_photo),
+                modifier = Modifier.fillMaxSize(),
+                contentScale = ContentScale.Crop
+            )
         }
     }
 }

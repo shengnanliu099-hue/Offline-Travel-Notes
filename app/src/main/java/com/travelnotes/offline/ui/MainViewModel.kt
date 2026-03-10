@@ -75,10 +75,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun addPickedImages(uris: List<Uri>) {
         if (uris.isEmpty()) return
 
-        val availableSlots = MAX_IMAGES_PER_NOTE - draftImages.size
-        if (availableSlots <= 0) return
-
-        val newItems = uris.take(availableSlots).map { uri ->
+        val newItems = uris.map { uri ->
             DraftImage.New(
                 id = nextDraftImageId("new"),
                 uri = uri
@@ -179,6 +176,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     companion object {
-        const val MAX_IMAGES_PER_NOTE = 9
+        const val MAX_IMAGE_PICKER_SELECTION = 99
     }
 }
