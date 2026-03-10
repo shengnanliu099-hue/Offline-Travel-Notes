@@ -800,21 +800,20 @@ private fun NoteListCard(note: Note, onOpen: () -> Unit) {
         colors = CardDefaults.cardColors(containerColor = Color(0xFF111316))
     ) {
         Column(modifier = Modifier.padding(14.dp)) {
+            Text(
+                text = if (note.title.isBlank()) stringResource(R.string.untitled_note) else note.title,
+                color = Color.White,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+
+            Spacer(modifier = Modifier.height(2.dp))
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+                horizontalArrangement = Arrangement.End
             ) {
-                Text(
-                    text = if (note.title.isBlank()) stringResource(R.string.untitled_note) else note.title,
-                    color = Color.White,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f)
-                )
-                Spacer(modifier = Modifier.width(8.dp))
                 Text(
                     text = formatTime(note.updatedAt),
                     color = Color(0xFF939BA7),
@@ -865,12 +864,6 @@ private fun NoteListCard(note: Note, onOpen: () -> Unit) {
                 )
             }
 
-            Spacer(modifier = Modifier.height(8.dp))
-            Text(
-                text = stringResource(R.string.hint_tap_to_open),
-                color = Color(0xFF8E96A3),
-                style = MaterialTheme.typography.bodySmall
-            )
         }
     }
 }
