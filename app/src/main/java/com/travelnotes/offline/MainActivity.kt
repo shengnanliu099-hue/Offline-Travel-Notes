@@ -82,6 +82,7 @@ import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material.icons.filled.Save
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -274,6 +275,7 @@ private fun TravelNotesScreen(
     var isSharingPdf by remember { mutableStateOf(false) }
     var imageViewerPaths by remember { mutableStateOf<List<String>>(emptyList()) }
     var imageViewerInitialIndex by remember { mutableStateOf(0) }
+    var isSettingsVisible by remember { mutableStateOf(false) }
 
     val pickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.PickMultipleVisualMedia(MainViewModel.MAX_IMAGE_PICKER_SELECTION)
@@ -301,6 +303,7 @@ private fun TravelNotesScreen(
     val openedNote = viewModel.notes.firstOrNull { it.id == openedNoteId }
 
     val hasOverlayToClose = imageViewerPaths.isNotEmpty() ||
+        isSettingsVisible ||
         capturedPreviewUri != null ||
         noteForPdfShare != null ||
         viewModel.isComposerVisible ||
@@ -310,6 +313,9 @@ private fun TravelNotesScreen(
             imageViewerPaths.isNotEmpty() -> {
                 imageViewerPaths = emptyList()
                 imageViewerInitialIndex = 0
+            }
+            isSettingsVisible -> {
+                isSettingsVisible = false
             }
             capturedPreviewUri != null -> {
                 capturedPreviewFile?.let(::deleteLocalFile)
@@ -332,9 +338,9 @@ private fun TravelNotesScreen(
             .background(
                 Brush.verticalGradient(
                     colors = if (isDarkMode) {
-                        listOf(Color(0xFF030303), Color(0xFF0E0E10), Color(0xFF121416))
+                        listOf(Color(0xFF020304), Color(0xFF070A0E), Color(0xFF0D1219))
                     } else {
-                        listOf(Color(0xFFF7F8FA), Color(0xFFF0F2F5), Color(0xFFE8ECF1))
+                        listOf(Color(0xFFE6ECF5), Color(0xFFDEE6F1), Color(0xFFD4DEEC))
                     }
                 )
             )
@@ -367,9 +373,8 @@ private fun TravelNotesScreen(
             ) {
                 item {
                     HeaderSection(
-                        themeMode = themeMode,
-                        onThemeModeChange = onThemeModeChange,
-                        isDarkMode = isDarkMode
+                        isDarkMode = isDarkMode,
+                        onOpenSettings = { isSettingsVisible = true }
                     )
                 }
 
@@ -554,14 +559,21 @@ private fun TravelNotesScreen(
                 imageViewerInitialIndex = 0
             }
         )
+
+        SettingsOverlay(
+            visible = isSettingsVisible,
+            isDarkMode = isDarkMode,
+            themeMode = themeMode,
+            onThemeModeChange = onThemeModeChange,
+            onDismiss = { isSettingsVisible = false }
+        )
     }
 }
 
 @Composable
 private fun HeaderSection(
-    themeMode: AppThemeMode,
-    onThemeModeChange: (AppThemeMode) -> Unit,
-    isDarkMode: Boolean
+    isDarkMode: Boolean,
+    onOpenSettings: () -> Unit
 ) {
     Column(
         modifier = Modifier
@@ -569,60 +581,63 @@ private fun HeaderSection(
             .background(
                 brush = Brush.horizontalGradient(
                     colors = if (isDarkMode) {
-                        listOf(Color(0xFF111214), Color(0xFF17191C), Color(0xFF0F1012))
+                        listOf(Color(0xFF1A2433), Color(0xFF1E2A3B), Color(0xFF172130))
                     } else {
-                        listOf(Color(0xFFF0F4FA), Color(0xFFE8EDF5), Color(0xFFE1E7F0))
+                        listOf(Color(0xFFF4F8FF), Color(0xFFECF2FC), Color(0xFFE5ECF8))
                     }
                 ),
                 shape = RoundedCornerShape(22.dp)
             )
+            .border(
+                width = 1.dp,
+                color = if (isDarkMode) Color(0xFF2C3A4E) else Color(0xFFD3DDEA),
+                shape = RoundedCornerShape(22.dp)
+            )
             .padding(horizontal = 16.dp, vertical = 14.dp)
     ) {
-        Text(
-            text = stringResource(R.string.header_title),
-            style = MaterialTheme.typography.headlineMedium,
-            color = if (isDarkMode) Color.White else Color(0xFF111317),
-            fontWeight = FontWeight.ExtraBold,
-            letterSpacing = 0.4.sp
-        )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = stringResource(R.string.header_title),
+                style = MaterialTheme.typography.headlineMedium,
+                color = if (isDarkMode) Color.White else Color(0xFF111317),
+                fontWeight = FontWeight.ExtraBold,
+                letterSpacing = 0.4.sp
+            )
+            IconButton(onClick = onOpenSettings) {
+                Icon(
+                    imageVector = Icons.Default.Settings,
+                    contentDescription = stringResource(R.string.cd_settings),
+                    tint = if (isDarkMode) Color(0xFFD9E2EE) else Color(0xFF2D3A4B)
+                )
+            }
+        }
         Text(
             text = stringResource(R.string.header_subtitle),
             style = MaterialTheme.typography.bodyMedium,
             color = if (isDarkMode) Color(0xFF9DA4AE) else Color(0xFF495060),
             modifier = Modifier.padding(top = 4.dp)
         )
-        Spacer(modifier = Modifier.height(10.dp))
-        Text(
-            text = stringResource(R.string.label_app_theme),
-            style = MaterialTheme.typography.bodySmall,
-            color = if (isDarkMode) Color(0xFFD7DEEA) else Color(0xFF4C5566)
-        )
-        Spacer(modifier = Modifier.height(8.dp))
-        LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            itemsIndexed(AppThemeMode.entries, key = { _, mode -> mode.storageValue }) { _, mode ->
-                FilterChip(
-                    selected = themeMode == mode,
-                    onClick = { onThemeModeChange(mode) },
-                    label = { Text(appThemeModeLabel(mode)) },
-                    colors = FilterChipDefaults.filterChipColors(
-                        selectedContainerColor = if (isDarkMode) Color(0xFFDAEDFF) else Color(0xFF1D2735),
-                        selectedLabelColor = if (isDarkMode) Color.Black else Color.White,
-                        containerColor = if (isDarkMode) Color(0xFF2B3038) else Color(0xFFDCE3ED),
-                        labelColor = if (isDarkMode) Color(0xFFD5DDE9) else Color(0xFF2A3442)
-                    )
-                )
-            }
-        }
     }
 }
 
 @Composable
 private fun EmptyStateCard(isDarkMode: Boolean) {
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .shadow(6.dp, RoundedCornerShape(18.dp))
+            .border(
+                width = 1.dp,
+                color = if (isDarkMode) Color(0xFF2F3E53) else Color(0xFFD3DCE9),
+                shape = RoundedCornerShape(18.dp)
+            ),
         shape = RoundedCornerShape(18.dp),
         colors = CardDefaults.cardColors(
-            containerColor = if (isDarkMode) Color(0xFF111316) else Color(0xFFF5F7FA)
+            containerColor = if (isDarkMode) Color(0xFF1A2330) else Color(0xFFFFFFFF)
         )
     ) {
         Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 20.dp)) {
@@ -638,6 +653,93 @@ private fun EmptyStateCard(isDarkMode: Boolean) {
                 color = if (isDarkMode) Color(0xFFA6ADBA) else Color(0xFF5C6575),
                 style = MaterialTheme.typography.bodyMedium
             )
+        }
+    }
+}
+
+@Composable
+private fun SettingsOverlay(
+    visible: Boolean,
+    isDarkMode: Boolean,
+    themeMode: AppThemeMode,
+    onThemeModeChange: (AppThemeMode) -> Unit,
+    onDismiss: () -> Unit
+) {
+    if (!visible) return
+    val interactionSource = remember { MutableInteractionSource() }
+
+    AnimatedVisibility(
+        visible = true,
+        enter = fadeIn(tween(220)) + scaleIn(tween(220), initialScale = 0.96f),
+        exit = fadeOut(tween(180)) + scaleOut(tween(180), targetScale = 0.96f)
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color.Black.copy(alpha = 0.62f))
+                .clickable(
+                    interactionSource = interactionSource,
+                    indication = null,
+                    onClick = onDismiss
+                ),
+            contentAlignment = Alignment.Center
+        ) {
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp)
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null,
+                        onClick = {}
+                    ),
+                shape = RoundedCornerShape(20.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = if (isDarkMode) Color(0xFF1A2330) else Color.White
+                )
+            ) {
+                Column(modifier = Modifier.padding(14.dp)) {
+                    Text(
+                        text = stringResource(R.string.settings_title),
+                        color = if (isDarkMode) Color.White else Color(0xFF12161E),
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Text(
+                        text = stringResource(R.string.label_app_theme),
+                        color = if (isDarkMode) Color(0xFFD8DEE8) else Color(0xFF394457),
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        itemsIndexed(AppThemeMode.entries, key = { _, mode -> mode.storageValue }) { _, mode ->
+                            FilterChip(
+                                selected = themeMode == mode,
+                                onClick = { onThemeModeChange(mode) },
+                                label = { Text(appThemeModeLabel(mode)) },
+                                colors = FilterChipDefaults.filterChipColors(
+                                    selectedContainerColor = if (isDarkMode) Color(0xFFDAEDFF) else Color(0xFF1D2735),
+                                    selectedLabelColor = if (isDarkMode) Color.Black else Color.White,
+                                    containerColor = if (isDarkMode) Color(0xFF2B3038) else Color(0xFFE0E6F0),
+                                    labelColor = if (isDarkMode) Color(0xFFD5DDE9) else Color(0xFF2A3442)
+                                )
+                            )
+                        }
+                    }
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.End
+                    ) {
+                        TextButton(onClick = onDismiss) {
+                            Text(
+                                text = stringResource(R.string.btn_done),
+                                color = if (isDarkMode) Color(0xFFC3CBD6) else Color(0xFF2C394D)
+                            )
+                        }
+                    }
+                }
+            }
         }
     }
 }
@@ -1716,10 +1818,16 @@ private fun NoteListCard(note: Note, onOpen: () -> Unit, isDarkMode: Boolean) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
+            .shadow(6.dp, RoundedCornerShape(18.dp))
+            .border(
+                width = 1.dp,
+                color = if (isDarkMode) Color(0xFF2F3E53) else Color(0xFFD3DCE9),
+                shape = RoundedCornerShape(18.dp)
+            )
             .clickable(onClick = onOpen),
         shape = RoundedCornerShape(18.dp),
         colors = CardDefaults.cardColors(
-            containerColor = if (isDarkMode) Color(0xFF111316) else Color(0xFFF5F7FA)
+            containerColor = if (isDarkMode) Color(0xFF1A2330) else Color(0xFFFFFFFF)
         )
     ) {
         Column(modifier = Modifier.padding(14.dp)) {

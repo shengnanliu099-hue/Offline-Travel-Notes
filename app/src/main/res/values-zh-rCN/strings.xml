@@ -9,6 +9,9 @@
     <string name="search_hint">搜索 #标签 或关键词</string>
     <string name="cd_search">搜索</string>
     <string name="cd_add_note">创建笔记</string>
+    <string name="cd_settings">设置</string>
+    <string name="settings_title">设置</string>
+    <string name="btn_done">完成</string>
 
     <string name="editor_new_title">新建笔记</string>
     <string name="editor_editing_title">编辑笔记</string>
