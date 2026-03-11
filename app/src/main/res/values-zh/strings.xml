@@ -67,6 +67,9 @@
     <string name="pdf_paper_small">小卡片</string>
     <string name="pdf_paper_medium">中卡片</string>
     <string name="pdf_paper_large">大卡片</string>
+    <string name="label_pdf_quality">导出画质</string>
+    <string name="pdf_quality_standard">标准</string>
+    <string name="pdf_quality_ultra">超清</string>
     <string name="label_pdf_watermark">水印（含应用名）</string>
     <string name="pdf_watermark_on">开启</string>
     <string name="pdf_watermark_off">关闭</string>

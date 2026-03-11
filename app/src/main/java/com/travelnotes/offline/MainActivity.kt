@@ -170,6 +170,11 @@ private enum class PdfCardSizeMode {
     LARGE
 }
 
+private enum class PdfExportQualityMode {
+    STANDARD,
+    ULTRA
+}
+
 private data class PdfCardMetrics(
     val pageWidth: Int,
     val pageHeight: Int,
@@ -355,7 +360,7 @@ private fun TravelNotesScreen(viewModel: MainViewModel = viewModel()) {
                     noteForPdfShare = null
                 }
             },
-            onShare = { note, withWatermark, paperMode ->
+            onShare = { note, withWatermark, paperMode, qualityMode ->
                 noteForPdfShare = null
                 coroutineScope.launch {
                     isSharingPdf = true
@@ -364,7 +369,8 @@ private fun TravelNotesScreen(viewModel: MainViewModel = viewModel()) {
                             context = context,
                             note = note,
                             includeWatermark = withWatermark,
-                            paperMode = paperMode
+                            paperMode = paperMode,
+                            qualityMode = qualityMode
                         )
                     }
                     isSharingPdf = false
@@ -606,11 +612,12 @@ private fun SharePdfOptionsOverlay(
     note: Note?,
     isSharing: Boolean,
     onDismiss: () -> Unit,
-    onShare: (Note, Boolean, PdfPaperMode) -> Unit
+    onShare: (Note, Boolean, PdfPaperMode, PdfExportQualityMode) -> Unit
 ) {
     val currentNote = note ?: return
     val interactionSource = remember { MutableInteractionSource() }
     var selectedPaperMode by remember(currentNote.id) { mutableStateOf(PdfPaperMode.AUTO) }
+    var selectedQualityMode by remember(currentNote.id) { mutableStateOf(PdfExportQualityMode.STANDARD) }
     var includeWatermark by remember(currentNote.id) { mutableStateOf(true) }
 
     AnimatedVisibility(
@@ -685,6 +692,30 @@ private fun SharePdfOptionsOverlay(
 
                     Spacer(modifier = Modifier.height(12.dp))
                     Text(
+                        text = stringResource(R.string.label_pdf_quality),
+                        color = Color(0xFFD8DEE8),
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        PdfExportQualityMode.entries.forEach { mode ->
+                            FilterChip(
+                                selected = selectedQualityMode == mode,
+                                onClick = { selectedQualityMode = mode },
+                                label = { Text(pdfQualityModeLabel(mode)) },
+                                enabled = !isSharing,
+                                colors = FilterChipDefaults.filterChipColors(
+                                    selectedContainerColor = Color(0xFFDAEDFF),
+                                    selectedLabelColor = Color.Black,
+                                    containerColor = Color(0xFF2B3038),
+                                    labelColor = Color(0xFFD5DDE9)
+                                )
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Text(
                         text = stringResource(R.string.label_pdf_watermark),
                         color = Color(0xFFD8DEE8),
                         style = MaterialTheme.typography.bodySmall
@@ -719,7 +750,9 @@ private fun SharePdfOptionsOverlay(
 
                     Spacer(modifier = Modifier.height(14.dp))
                     Button(
-                        onClick = { onShare(currentNote, includeWatermark, selectedPaperMode) },
+                        onClick = {
+                            onShare(currentNote, includeWatermark, selectedPaperMode, selectedQualityMode)
+                        },
                         enabled = !isSharing,
                         modifier = Modifier.fillMaxWidth(),
                         colors = ButtonDefaults.buttonColors(
@@ -1384,6 +1417,14 @@ private fun pdfPaperModeLabel(mode: PdfPaperMode): String {
 }
 
 @Composable
+private fun pdfQualityModeLabel(mode: PdfExportQualityMode): String {
+    return when (mode) {
+        PdfExportQualityMode.STANDARD -> stringResource(R.string.pdf_quality_standard)
+        PdfExportQualityMode.ULTRA -> stringResource(R.string.pdf_quality_ultra)
+    }
+}
+
+@Composable
 private fun DraftImagesRow(
     images: List<DraftImage>,
     onRemoveImage: (DraftImage) -> Unit,
@@ -1995,7 +2036,8 @@ private fun buildNotePdfUri(
     context: Context,
     note: Note,
     includeWatermark: Boolean,
-    paperMode: PdfPaperMode
+    paperMode: PdfPaperMode,
+    qualityMode: PdfExportQualityMode
 ): Uri? {
     val outputDir = File(context.cacheDir, "shared_pdfs")
     if (!outputDir.exists()) {
@@ -2269,7 +2311,8 @@ private fun buildNotePdfUri(
                     val bitmap = decodeBitmapForPdf(
                         path = item.path,
                         targetWidth = item.width.toInt().coerceAtLeast(1),
-                        targetHeight = item.height.toInt().coerceAtLeast(1)
+                        targetHeight = item.height.toInt().coerceAtLeast(1),
+                        qualityMode = qualityMode
                     )
                     if (bitmap != null) {
                         drawRoundedBitmap(
@@ -2301,15 +2344,32 @@ private fun buildNotePdfUri(
     }
 }
 
-private fun decodeBitmapForPdf(path: String, targetWidth: Int, targetHeight: Int): Bitmap? {
+private fun decodeBitmapForPdf(
+    path: String,
+    targetWidth: Int,
+    targetHeight: Int,
+    qualityMode: PdfExportQualityMode
+): Bitmap? {
     val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
     BitmapFactory.decodeFile(path, bounds)
     if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null
 
     val safeTargetWidth = targetWidth.coerceAtLeast(1)
     val safeTargetHeight = targetHeight.coerceAtLeast(1)
-    val requestedWidth = (safeTargetWidth * 6).coerceAtMost(8192)
-    val requestedHeight = (safeTargetHeight * 6).coerceAtMost(8192)
+    val multiplier = when (qualityMode) {
+        PdfExportQualityMode.STANDARD -> 6
+        PdfExportQualityMode.ULTRA -> 10
+    }
+    val maxDimension = when (qualityMode) {
+        PdfExportQualityMode.STANDARD -> 8192
+        PdfExportQualityMode.ULTRA -> 12288
+    }
+    val minimumScaleFactor = when (qualityMode) {
+        PdfExportQualityMode.STANDARD -> 2
+        PdfExportQualityMode.ULTRA -> 3
+    }
+    val requestedWidth = (safeTargetWidth * multiplier).coerceAtMost(maxDimension)
+    val requestedHeight = (safeTargetHeight * multiplier).coerceAtMost(maxDimension)
 
     val widthRatio = bounds.outWidth.toFloat() / requestedWidth.toFloat()
     val heightRatio = bounds.outHeight.toFloat() / requestedHeight.toFloat()
@@ -2327,7 +2387,10 @@ private fun decodeBitmapForPdf(path: String, targetWidth: Int, targetHeight: Int
     while (
         bitmap != null &&
         sampleSize > 1 &&
-        (bitmap.width < safeTargetWidth * 2 || bitmap.height < safeTargetHeight * 2)
+        (
+            bitmap.width < safeTargetWidth * minimumScaleFactor ||
+            bitmap.height < safeTargetHeight * minimumScaleFactor
+        )
     ) {
         bitmap.recycle()
         sampleSize = (sampleSize / 2).coerceAtLeast(1)

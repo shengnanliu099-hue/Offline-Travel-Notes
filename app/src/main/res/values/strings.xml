@@ -67,6 +67,9 @@
     <string name="pdf_paper_small">Small Card</string>
     <string name="pdf_paper_medium">Medium Card</string>
     <string name="pdf_paper_large">Large Card</string>
+    <string name="label_pdf_quality">Export Quality</string>
+    <string name="pdf_quality_standard">Standard</string>
+    <string name="pdf_quality_ultra">Ultra HD</string>
     <string name="label_pdf_watermark">Watermark (with app name)</string>
     <string name="pdf_watermark_on">On</string>
     <string name="pdf_watermark_off">Off</string>
