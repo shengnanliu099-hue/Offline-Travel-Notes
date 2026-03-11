@@ -8,8 +8,6 @@ import android.content.SharedPreferences
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Canvas
-import android.graphics.ColorMatrix
-import android.graphics.ColorMatrixColorFilter
 import android.graphics.Paint
 import android.graphics.Path
 import android.graphics.Rect
@@ -180,8 +178,9 @@ private enum class PdfExportQualityMode {
 }
 
 private enum class PdfStyleMode {
-    COLOR,
-    MONOCHROME
+    FOLLOW_APP,
+    BLACK_THEME,
+    WHITE_THEME
 }
 
 private enum class AppThemeMode(val storageValue: String) {
@@ -464,7 +463,8 @@ private fun TravelNotesScreen(
                             includeWatermark = withWatermark,
                             paperMode = paperMode,
                             qualityMode = qualityMode,
-                            styleMode = styleMode
+                            styleMode = styleMode,
+                            appIsDarkTheme = isDarkMode
                         )
                     }
                     isSharingPdf = false
@@ -841,7 +841,7 @@ private fun SharePdfOptionsOverlay(
     val interactionSource = remember { MutableInteractionSource() }
     var selectedPaperMode by remember(currentNote.id) { mutableStateOf(PdfPaperMode.AUTO) }
     var selectedQualityMode by remember(currentNote.id) { mutableStateOf(PdfExportQualityMode.STANDARD) }
-    var selectedStyleMode by remember(currentNote.id) { mutableStateOf(PdfStyleMode.COLOR) }
+    var selectedStyleMode by remember(currentNote.id) { mutableStateOf(PdfStyleMode.FOLLOW_APP) }
     var includeWatermark by remember(currentNote.id) { mutableStateOf(true) }
 
     AnimatedVisibility(
@@ -902,7 +902,14 @@ private fun SharePdfOptionsOverlay(
                             FilterChip(
                                 selected = mode == selectedPaperMode,
                                 onClick = { selectedPaperMode = mode },
-                                label = { Text(pdfPaperModeLabel(mode)) },
+                                label = {
+                                    Text(
+                                        text = pdfPaperModeLabel(mode),
+                                        maxLines = 1,
+                                        softWrap = false,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                },
                                 enabled = !isSharing,
                                 colors = FilterChipDefaults.filterChipColors(
                                     selectedContainerColor = Color(0xFFDAEDFF),
@@ -945,12 +952,22 @@ private fun SharePdfOptionsOverlay(
                         style = MaterialTheme.typography.bodySmall
                     )
                     Spacer(modifier = Modifier.height(8.dp))
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        PdfStyleMode.entries.forEach { mode ->
+                    LazyRow(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        itemsIndexed(PdfStyleMode.entries, key = { _, mode -> mode.name }) { _, mode ->
                             FilterChip(
                                 selected = selectedStyleMode == mode,
                                 onClick = { selectedStyleMode = mode },
-                                label = { Text(pdfStyleModeLabel(mode)) },
+                                label = {
+                                    Text(
+                                        text = pdfStyleModeLabel(mode),
+                                        maxLines = 1,
+                                        softWrap = false,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                },
                                 enabled = !isSharing,
                                 colors = FilterChipDefaults.filterChipColors(
                                     selectedContainerColor = Color(0xFFDAEDFF),
@@ -1681,8 +1698,9 @@ private fun pdfQualityModeLabel(mode: PdfExportQualityMode): String {
 @Composable
 private fun pdfStyleModeLabel(mode: PdfStyleMode): String {
     return when (mode) {
-        PdfStyleMode.COLOR -> stringResource(R.string.pdf_style_color)
-        PdfStyleMode.MONOCHROME -> stringResource(R.string.pdf_style_monochrome)
+        PdfStyleMode.FOLLOW_APP -> stringResource(R.string.pdf_style_follow_app)
+        PdfStyleMode.BLACK_THEME -> stringResource(R.string.pdf_style_black_theme)
+        PdfStyleMode.WHITE_THEME -> stringResource(R.string.pdf_style_white_theme)
     }
 }
 
@@ -2309,7 +2327,8 @@ private fun buildNotePdfUri(
     includeWatermark: Boolean,
     paperMode: PdfPaperMode,
     qualityMode: PdfExportQualityMode,
-    styleMode: PdfStyleMode
+    styleMode: PdfStyleMode,
+    appIsDarkTheme: Boolean
 ): Uri? {
     val outputDir = File(context.cacheDir, "shared_pdfs")
     if (!outputDir.exists()) {
@@ -2347,38 +2366,59 @@ private fun buildNotePdfUri(
     val contentRight = cardRect.right - cardPaddingX
     val contentWidth = contentRight - contentLeft
 
-    val cardPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = android.graphics.Color.WHITE
+    val isDarkPdfTheme = when (styleMode) {
+        PdfStyleMode.FOLLOW_APP -> appIsDarkTheme
+        PdfStyleMode.BLACK_THEME -> true
+        PdfStyleMode.WHITE_THEME -> false
     }
-    val isMonochrome = styleMode == PdfStyleMode.MONOCHROME
+    val pageBackgroundColor = if (isDarkPdfTheme) {
+        android.graphics.Color.parseColor("#070B12")
+    } else {
+        android.graphics.Color.parseColor("#F3F5F8")
+    }
+    val cardPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = if (isDarkPdfTheme) {
+            android.graphics.Color.parseColor("#172131")
+        } else {
+            android.graphics.Color.WHITE
+        }
+    }
     val dividerPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = if (isMonochrome) {
-            android.graphics.Color.parseColor("#D7D7D7")
+        color = if (isDarkPdfTheme) {
+            android.graphics.Color.parseColor("#2A3B55")
         } else {
             android.graphics.Color.parseColor("#E6E9EE")
         }
         strokeWidth = 2f
     }
     val headerTitlePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = android.graphics.Color.parseColor("#111318")
+        color = if (isDarkPdfTheme) {
+            android.graphics.Color.parseColor("#F4F8FF")
+        } else {
+            android.graphics.Color.parseColor("#111318")
+        }
         textSize = 44f * scale
         typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
     }
     val headerMetaPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = if (isMonochrome) {
-            android.graphics.Color.parseColor("#7A7A7A")
+        color = if (isDarkPdfTheme) {
+            android.graphics.Color.parseColor("#A8B8CE")
         } else {
             android.graphics.Color.parseColor("#8F97A5")
         }
         textSize = 24f * scale
     }
     val bodyPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = android.graphics.Color.parseColor("#171A1F")
+        color = if (isDarkPdfTheme) {
+            android.graphics.Color.parseColor("#E8EEF8")
+        } else {
+            android.graphics.Color.parseColor("#171A1F")
+        }
         textSize = 30f * scale
     }
     val chipTextPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = if (isMonochrome) {
-            android.graphics.Color.parseColor("#2A2A2A")
+        color = if (isDarkPdfTheme) {
+            android.graphics.Color.parseColor("#CCE3FF")
         } else {
             android.graphics.Color.parseColor("#135CAB")
         }
@@ -2386,30 +2426,30 @@ private fun buildNotePdfUri(
         typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
     }
     val chipBackgroundPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = if (isMonochrome) {
-            android.graphics.Color.parseColor("#EEEEEE")
+        color = if (isDarkPdfTheme) {
+            android.graphics.Color.parseColor("#23344D")
         } else {
             android.graphics.Color.parseColor("#EAF3FF")
         }
     }
     val imagePlaceholderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = if (isMonochrome) {
-            android.graphics.Color.parseColor("#D6D6D6")
+        color = if (isDarkPdfTheme) {
+            android.graphics.Color.parseColor("#243346")
         } else {
             android.graphics.Color.parseColor("#E8EBF0")
         }
     }
     val footerPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = if (isMonochrome) {
-            android.graphics.Color.parseColor("#767676")
+        color = if (isDarkPdfTheme) {
+            android.graphics.Color.parseColor("#9EB0C8")
         } else {
             android.graphics.Color.parseColor("#8A92A0")
         }
         textSize = 22f * scale
     }
     val watermarkPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = if (isMonochrome) {
-            android.graphics.Color.parseColor("#8A8A8A")
+        color = if (isDarkPdfTheme) {
+            android.graphics.Color.parseColor("#92A4BA")
         } else {
             android.graphics.Color.parseColor("#97A0AF")
         }
@@ -2444,7 +2484,7 @@ private fun buildNotePdfUri(
         page = document.startPage(pageInfo)
         canvas = page.canvas
         canvas.scale(renderScale, renderScale)
-        canvas.drawColor(android.graphics.Color.parseColor("#F3F5F8"))
+        canvas.drawColor(pageBackgroundColor)
         val cardCornerRadius = 30f * scale
         canvas.drawRoundRect(cardRect, cardCornerRadius, cardCornerRadius, cardPaint)
 
@@ -2636,8 +2676,7 @@ private fun buildNotePdfUri(
                             canvas = canvas,
                             bitmap = bitmap,
                             rect = rect,
-                            radius = metrics.imageCornerRadius,
-                            monochrome = isMonochrome
+                            radius = metrics.imageCornerRadius
                         )
                         bitmap.recycle()
                     }
@@ -2721,8 +2760,7 @@ private fun drawRoundedBitmap(
     canvas: Canvas,
     bitmap: Bitmap,
     rect: RectF,
-    radius: Float,
-    monochrome: Boolean
+    radius: Float
 ) {
     val clipPath = Path().apply {
         addRoundRect(rect, radius, radius, Path.Direction.CW)
@@ -2742,12 +2780,7 @@ private fun drawRoundedBitmap(
     }
     val checkpoint = canvas.save()
     canvas.clipPath(clipPath)
-    val bitmapPaint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG or Paint.DITHER_FLAG).apply {
-        if (monochrome) {
-            val matrix = ColorMatrix().apply { setSaturation(0f) }
-            colorFilter = ColorMatrixColorFilter(matrix)
-        }
-    }
+    val bitmapPaint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG or Paint.DITHER_FLAG)
     canvas.drawBitmap(bitmap, srcRect, rect, bitmapPaint)
     canvas.restoreToCount(checkpoint)
 }
@@ -2758,11 +2791,11 @@ private fun resolvePdfCardMetrics(sizeMode: PdfCardSizeMode): PdfCardMetrics {
             pageWidth = 1240,
             pageHeight = 1754,
             cardInsetX = 220f,
-            cardInsetTop = 250f,
-            cardInsetBottom = 230f,
+            cardInsetTop = 310f,
+            cardInsetBottom = 430f,
             cardPaddingX = 34f,
             cardPaddingTop = 30f,
-            footerAreaHeight = 68f,
+            footerAreaHeight = 64f,
             scale = 0.8f,
             imageGap = 8f,
             imageCornerRadius = 12f

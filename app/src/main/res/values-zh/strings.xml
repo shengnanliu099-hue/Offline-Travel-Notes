@@ -77,9 +77,10 @@
     <string name="label_pdf_quality">导出画质</string>
     <string name="pdf_quality_standard">标准</string>
     <string name="pdf_quality_ultra">超清</string>
-    <string name="label_pdf_style">PDF 卡片样式</string>
-    <string name="pdf_style_color">彩色</string>
-    <string name="pdf_style_monochrome">黑白</string>
+    <string name="label_pdf_style">PDF 主题</string>
+    <string name="pdf_style_follow_app">跟随应用主题</string>
+    <string name="pdf_style_black_theme">黑色主题</string>
+    <string name="pdf_style_white_theme">白色主题</string>
     <string name="label_pdf_watermark">水印（含应用名）</string>
     <string name="pdf_watermark_on">开启</string>
     <string name="pdf_watermark_off">关闭</string>

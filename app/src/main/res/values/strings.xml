@@ -77,9 +77,10 @@
     <string name="label_pdf_quality">Export Quality</string>
     <string name="pdf_quality_standard">Standard</string>
     <string name="pdf_quality_ultra">Ultra HD</string>
-    <string name="label_pdf_style">PDF Card Style</string>
-    <string name="pdf_style_color">Color</string>
-    <string name="pdf_style_monochrome">Black &amp; White</string>
+    <string name="label_pdf_style">PDF Theme</string>
+    <string name="pdf_style_follow_app">Follow App Theme</string>
+    <string name="pdf_style_black_theme">Black Theme</string>
+    <string name="pdf_style_white_theme">White Theme</string>
     <string name="label_pdf_watermark">Watermark (with app name)</string>
     <string name="pdf_watermark_on">On</string>
     <string name="pdf_watermark_off">Off</string>
