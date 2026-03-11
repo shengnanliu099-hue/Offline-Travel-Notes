@@ -40,6 +40,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
+import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.aspectRatio
@@ -60,6 +61,8 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.relocation.BringIntoViewRequester
 import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.foundation.rememberScrollState
@@ -194,6 +197,11 @@ private data class PdfImageRow(
     val items: List<PdfImageItem>
 )
 
+private data class MosaicImageEntry(
+    val absoluteIndex: Int,
+    val path: String
+)
+
 @Composable
 private fun TravelNotesScreen(viewModel: MainViewModel = viewModel()) {
     val context = LocalContext.current
@@ -206,6 +214,8 @@ private fun TravelNotesScreen(viewModel: MainViewModel = viewModel()) {
     var isConfirmingCapturedPhoto by remember { mutableStateOf(false) }
     var noteForPdfShare by remember { mutableStateOf<Note?>(null) }
     var isSharingPdf by remember { mutableStateOf(false) }
+    var imageViewerPaths by remember { mutableStateOf<List<String>>(emptyList()) }
+    var imageViewerInitialIndex by remember { mutableStateOf(0) }
 
     val pickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.PickMultipleVisualMedia(MainViewModel.MAX_IMAGE_PICKER_SELECTION)
@@ -330,7 +340,11 @@ private fun TravelNotesScreen(viewModel: MainViewModel = viewModel()) {
                 openedNoteId = null
                 viewModel.deleteNote(it)
             },
-            onShare = { noteForPdfShare = it }
+            onShare = { noteForPdfShare = it },
+            onImageClick = { imagePaths, index ->
+                imageViewerPaths = imagePaths
+                imageViewerInitialIndex = index
+            }
         )
 
         SharePdfOptionsOverlay(
@@ -434,6 +448,15 @@ private fun TravelNotesScreen(viewModel: MainViewModel = viewModel()) {
                 capturedPreviewFile?.let(::deleteLocalFile)
                 capturedPreviewFile = null
                 capturedPreviewUri = null
+            }
+        )
+
+        NoteImageViewerOverlay(
+            imagePaths = imageViewerPaths,
+            initialIndex = imageViewerInitialIndex,
+            onDismiss = {
+                imageViewerPaths = emptyList()
+                imageViewerInitialIndex = 0
             }
         )
     }
@@ -826,7 +849,8 @@ private fun NoteDetailOverlay(
     onDismiss: () -> Unit,
     onEdit: (Note) -> Unit,
     onDelete: (Note) -> Unit,
-    onShare: (Note) -> Unit
+    onShare: (Note) -> Unit,
+    onImageClick: (List<String>, Int) -> Unit
 ) {
     val currentNote = note ?: return
     val interactionSource = remember { MutableInteractionSource() }
@@ -911,7 +935,10 @@ private fun NoteDetailOverlay(
                         NoteImagesMosaic(
                             imagePaths = currentNote.imagePaths,
                             maxPreview = Int.MAX_VALUE,
-                            layoutMode = currentNote.imageLayoutMode
+                            layoutMode = currentNote.imageLayoutMode,
+                            onImageClick = { index ->
+                                onImageClick(currentNote.imagePaths, index)
+                            }
                         )
                     }
 
@@ -967,6 +994,125 @@ private fun NoteDetailOverlay(
                     }
                 }
             }
+        }
+    }
+}
+
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun NoteImageViewerOverlay(
+    imagePaths: List<String>,
+    initialIndex: Int,
+    onDismiss: () -> Unit
+) {
+    if (imagePaths.isEmpty()) return
+    val safeInitialPage = initialIndex.coerceIn(0, imagePaths.lastIndex)
+    val pagerState = rememberPagerState(
+        initialPage = safeInitialPage,
+        pageCount = { imagePaths.size }
+    )
+
+    AnimatedVisibility(
+        visible = true,
+        enter = fadeIn(tween(180)),
+        exit = fadeOut(tween(180))
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color.Black.copy(alpha = 0.97f))
+        ) {
+            HorizontalPager(
+                state = pagerState,
+                modifier = Modifier.fillMaxSize()
+            ) { page ->
+                ZoomableViewerImage(
+                    path = imagePaths[page],
+                    modifier = Modifier.fillMaxSize()
+                )
+            }
+
+            Row(
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .fillMaxWidth()
+                    .padding(horizontal = 10.dp, vertical = 14.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "${pagerState.currentPage + 1}/${imagePaths.size}",
+                    color = Color.White,
+                    style = MaterialTheme.typography.titleMedium
+                )
+                IconButton(onClick = onDismiss) {
+                    Icon(
+                        imageVector = Icons.Default.Close,
+                        contentDescription = stringResource(R.string.cd_close),
+                        tint = Color.White
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ZoomableViewerImage(path: String, modifier: Modifier = Modifier) {
+    val file = remember(path) { File(path) }
+    var rawScale by remember(path) { mutableFloatStateOf(1f) }
+    var offsetX by remember(path) { mutableFloatStateOf(0f) }
+    var offsetY by remember(path) { mutableFloatStateOf(0f) }
+
+    val displayScale by animateFloatAsState(
+        targetValue = when {
+            rawScale < 0.85f -> 1f
+            rawScale < 1f -> rawScale
+            else -> rawScale.coerceIn(1f, 5f)
+        },
+        animationSpec = tween(durationMillis = 170),
+        label = "viewerScale"
+    )
+
+    LaunchedEffect(displayScale) {
+        if (displayScale <= 1.02f && (offsetX != 0f || offsetY != 0f)) {
+            offsetX = 0f
+            offsetY = 0f
+        }
+    }
+
+    Box(
+        modifier = modifier
+            .background(Color.Black)
+            .pointerInput(path) {
+                detectTransformGestures { _, pan, zoom, _ ->
+                    val nextScale = (rawScale * zoom).coerceIn(0.65f, 5f)
+                    rawScale = nextScale
+                    if (nextScale > 1f) {
+                        offsetX += pan.x
+                        offsetY += pan.y
+                    } else {
+                        offsetX = 0f
+                        offsetY = 0f
+                    }
+                }
+            },
+        contentAlignment = Alignment.Center
+    ) {
+        if (file.exists()) {
+            AsyncImage(
+                model = file,
+                contentDescription = stringResource(R.string.cd_note_photo),
+                modifier = Modifier
+                    .fillMaxSize()
+                    .graphicsLayer {
+                        scaleX = displayScale
+                        scaleY = displayScale
+                        translationX = offsetX
+                        translationY = offsetY
+                    },
+                contentScale = ContentScale.Fit
+            )
         }
     }
 }
@@ -1434,29 +1580,40 @@ private fun NoteListCard(note: Note, onOpen: () -> Unit) {
 private fun NoteImagesMosaic(
     imagePaths: List<String>,
     maxPreview: Int,
-    layoutMode: ImageLayoutMode
+    layoutMode: ImageLayoutMode,
+    onImageClick: ((Int) -> Unit)? = null
 ) {
-    val visiblePaths = if (maxPreview == Int.MAX_VALUE) imagePaths else imagePaths.take(maxPreview)
-    if (visiblePaths.isEmpty()) return
+    val visibleEntries = if (maxPreview == Int.MAX_VALUE) {
+        imagePaths.mapIndexed { index, path -> MosaicImageEntry(absoluteIndex = index, path = path) }
+    } else {
+        imagePaths.take(maxPreview).mapIndexed { index, path ->
+            MosaicImageEntry(absoluteIndex = index, path = path)
+        }
+    }
+    if (visibleEntries.isEmpty()) return
 
     when (layoutMode) {
-        ImageLayoutMode.AUTO -> NoteImagesMosaicAuto(visiblePaths)
-        ImageLayoutMode.SMALL -> NoteImagesMosaicSmall(visiblePaths)
-        ImageLayoutMode.TWO_COLUMNS -> NoteImagesMosaicTwoColumns(visiblePaths)
-        ImageLayoutMode.LARGE_FIRST -> NoteImagesMosaicFocus(visiblePaths, focusLast = false)
-        ImageLayoutMode.LARGE_LAST -> NoteImagesMosaicFocus(visiblePaths, focusLast = true)
+        ImageLayoutMode.AUTO -> NoteImagesMosaicAuto(visibleEntries, onImageClick)
+        ImageLayoutMode.SMALL -> NoteImagesMosaicSmall(visibleEntries, onImageClick)
+        ImageLayoutMode.TWO_COLUMNS -> NoteImagesMosaicTwoColumns(visibleEntries, onImageClick)
+        ImageLayoutMode.LARGE_FIRST -> NoteImagesMosaicFocus(visibleEntries, onImageClick, focusLast = false)
+        ImageLayoutMode.LARGE_LAST -> NoteImagesMosaicFocus(visibleEntries, onImageClick, focusLast = true)
     }
 }
 
 @Composable
-private fun NoteImagesMosaicAuto(visiblePaths: List<String>) {
-    when (visiblePaths.size) {
+private fun NoteImagesMosaicAuto(
+    visibleEntries: List<MosaicImageEntry>,
+    onImageClick: ((Int) -> Unit)?
+) {
+    when (visibleEntries.size) {
         1 -> {
             MosaicImageCell(
-                path = visiblePaths[0],
+                entry = visibleEntries[0],
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(188.dp)
+                    .height(188.dp),
+                onImageClick = onImageClick
             )
         }
         2 -> {
@@ -1465,16 +1622,18 @@ private fun NoteImagesMosaicAuto(visiblePaths: List<String>) {
                 horizontalArrangement = Arrangement.spacedBy(6.dp)
             ) {
                 MosaicImageCell(
-                    path = visiblePaths[0],
+                    entry = visibleEntries[0],
                     modifier = Modifier
                         .weight(1f)
-                        .height(128.dp)
+                        .height(128.dp),
+                    onImageClick = onImageClick
                 )
                 MosaicImageCell(
-                    path = visiblePaths[1],
+                    entry = visibleEntries[1],
                     modifier = Modifier
                         .weight(1f)
-                        .height(128.dp)
+                        .height(128.dp),
+                    onImageClick = onImageClick
                 )
             }
         }
@@ -1485,70 +1644,105 @@ private fun NoteImagesMosaicAuto(visiblePaths: List<String>) {
                     horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
                     MosaicImageCell(
-                        path = visiblePaths[0],
+                        entry = visibleEntries[0],
                         modifier = Modifier
                             .weight(1f)
-                            .height(94.dp)
+                            .height(94.dp),
+                        onImageClick = onImageClick
                     )
                     MosaicImageCell(
-                        path = visiblePaths[1],
+                        entry = visibleEntries[1],
                         modifier = Modifier
                             .weight(1f)
-                            .height(94.dp)
+                            .height(94.dp),
+                        onImageClick = onImageClick
                     )
                 }
                 MosaicImageCell(
-                    path = visiblePaths[2],
+                    entry = visibleEntries[2],
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(128.dp)
+                        .height(128.dp),
+                    onImageClick = onImageClick
                 )
             }
         }
-        4 -> NoteImagesMosaicGrid(visiblePaths, columns = 2, fixedHeight = 98.dp)
-        else -> NoteImagesMosaicGrid(visiblePaths, columns = 3, fixedHeight = null)
+        4 -> NoteImagesMosaicGrid(
+            entries = visibleEntries,
+            columns = 2,
+            fixedHeight = 98.dp,
+            onImageClick = onImageClick
+        )
+        else -> NoteImagesMosaicGrid(
+            entries = visibleEntries,
+            columns = 3,
+            fixedHeight = null,
+            onImageClick = onImageClick
+        )
     }
 }
 
 @Composable
-private fun NoteImagesMosaicSmall(visiblePaths: List<String>) {
-    if (visiblePaths.size == 1) {
+private fun NoteImagesMosaicSmall(
+    visibleEntries: List<MosaicImageEntry>,
+    onImageClick: ((Int) -> Unit)?
+) {
+    if (visibleEntries.size == 1) {
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.Start
         ) {
             MosaicImageCell(
-                path = visiblePaths[0],
+                entry = visibleEntries[0],
                 modifier = Modifier
-                    .size(112.dp)
+                    .size(112.dp),
+                onImageClick = onImageClick
             )
         }
         return
     }
-    NoteImagesMosaicGrid(visiblePaths, columns = 3, fixedHeight = null)
+    NoteImagesMosaicGrid(
+        entries = visibleEntries,
+        columns = 3,
+        fixedHeight = null,
+        onImageClick = onImageClick
+    )
 }
 
 @Composable
-private fun NoteImagesMosaicTwoColumns(visiblePaths: List<String>) {
-    val columns = if (visiblePaths.size == 1) 1 else 2
-    NoteImagesMosaicGrid(visiblePaths, columns = columns, fixedHeight = 118.dp)
+private fun NoteImagesMosaicTwoColumns(
+    visibleEntries: List<MosaicImageEntry>,
+    onImageClick: ((Int) -> Unit)?
+) {
+    val columns = if (visibleEntries.size == 1) 1 else 2
+    NoteImagesMosaicGrid(
+        entries = visibleEntries,
+        columns = columns,
+        fixedHeight = 118.dp,
+        onImageClick = onImageClick
+    )
 }
 
 @Composable
-private fun NoteImagesMosaicFocus(visiblePaths: List<String>, focusLast: Boolean) {
-    if (visiblePaths.size == 1) {
+private fun NoteImagesMosaicFocus(
+    visibleEntries: List<MosaicImageEntry>,
+    onImageClick: ((Int) -> Unit)?,
+    focusLast: Boolean
+) {
+    if (visibleEntries.size == 1) {
         MosaicImageCell(
-            path = visiblePaths[0],
+            entry = visibleEntries[0],
             modifier = Modifier
                 .fillMaxWidth()
-                .height(188.dp)
+                .height(188.dp),
+            onImageClick = onImageClick
         )
         return
     }
 
-    val focusIndex = if (focusLast) visiblePaths.lastIndex else 0
-    val focusPath = visiblePaths[focusIndex]
-    val sidePaths = visiblePaths.filterIndexed { index, _ -> index != focusIndex }
+    val focusIndex = if (focusLast) visibleEntries.lastIndex else 0
+    val focusEntry = visibleEntries[focusIndex]
+    val sideEntries = visibleEntries.filterIndexed { index, _ -> index != focusIndex }
 
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
         Row(
@@ -1557,10 +1751,11 @@ private fun NoteImagesMosaicFocus(visiblePaths: List<String>, focusLast: Boolean
         ) {
             if (!focusLast) {
                 MosaicImageCell(
-                    path = focusPath,
+                    entry = focusEntry,
                     modifier = Modifier
                         .weight(1.85f)
-                        .height(176.dp)
+                        .height(176.dp),
+                    onImageClick = onImageClick
                 )
             }
 
@@ -1570,62 +1765,71 @@ private fun NoteImagesMosaicFocus(visiblePaths: List<String>, focusLast: Boolean
                     .height(176.dp),
                 verticalArrangement = Arrangement.spacedBy(6.dp)
             ) {
-                val topPath = sidePaths.getOrNull(0)
-                val secondPath = sidePaths.getOrNull(1)
-                if (topPath != null) {
+                val topEntry = sideEntries.getOrNull(0)
+                val secondEntry = sideEntries.getOrNull(1)
+                if (topEntry != null) {
                     MosaicImageCell(
-                        path = topPath,
+                        entry = topEntry,
                         modifier = Modifier
                             .fillMaxWidth()
-                            .weight(if (secondPath == null) 1f else 0.5f)
+                            .weight(if (secondEntry == null) 1f else 0.5f),
+                        onImageClick = onImageClick
                     )
                 }
-                if (secondPath != null) {
+                if (secondEntry != null) {
                     MosaicImageCell(
-                        path = secondPath,
+                        entry = secondEntry,
                         modifier = Modifier
                             .fillMaxWidth()
-                            .weight(0.5f)
+                            .weight(0.5f),
+                        onImageClick = onImageClick
                     )
                 }
-                if (topPath == null) {
+                if (topEntry == null) {
                     Spacer(modifier = Modifier.weight(1f))
                 }
             }
 
             if (focusLast) {
                 MosaicImageCell(
-                    path = focusPath,
+                    entry = focusEntry,
                     modifier = Modifier
                         .weight(1.85f)
-                        .height(176.dp)
+                        .height(176.dp),
+                    onImageClick = onImageClick
                 )
             }
         }
 
-        val remaining = sidePaths.drop(2)
+        val remaining = sideEntries.drop(2)
         if (remaining.isNotEmpty()) {
-            NoteImagesMosaicGrid(remaining, columns = 3, fixedHeight = null)
+            NoteImagesMosaicGrid(
+                entries = remaining,
+                columns = 3,
+                fixedHeight = null,
+                onImageClick = onImageClick
+            )
         }
     }
 }
 
 @Composable
 private fun NoteImagesMosaicGrid(
-    paths: List<String>,
+    entries: List<MosaicImageEntry>,
     columns: Int,
-    fixedHeight: androidx.compose.ui.unit.Dp?
+    fixedHeight: androidx.compose.ui.unit.Dp?,
+    onImageClick: ((Int) -> Unit)?
 ) {
-    if (paths.isEmpty()) return
+    if (entries.isEmpty()) return
 
-    val rows = paths.chunked(columns)
+    val rows = entries.chunked(columns)
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        rows.forEach { rowPaths ->
+        rows.forEach { rowEntries ->
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(6.dp)
             ) {
-                rowPaths.forEach { path ->
+                rowEntries.forEach { entry ->
                     val cellModifier = if (fixedHeight != null) {
                         Modifier
                             .weight(1f)
@@ -1636,11 +1840,12 @@ private fun NoteImagesMosaicGrid(
                             .aspectRatio(1f)
                     }
                     MosaicImageCell(
-                        path = path,
-                        modifier = cellModifier
+                        entry = entry,
+                        modifier = cellModifier,
+                        onImageClick = onImageClick
                     )
                 }
-                repeat(columns - rowPaths.size) {
+                repeat(columns - rowEntries.size) {
                     val spacerModifier = if (fixedHeight != null) {
                         Modifier
                             .weight(1f)
@@ -1658,10 +1863,19 @@ private fun NoteImagesMosaicGrid(
 }
 
 @Composable
-private fun MosaicImageCell(path: String, modifier: Modifier) {
-    val file = File(path)
+private fun MosaicImageCell(
+    entry: MosaicImageEntry,
+    modifier: Modifier,
+    onImageClick: ((Int) -> Unit)?
+) {
+    val file = File(entry.path)
+    val clickableModifier = if (onImageClick != null) {
+        modifier.clickable { onImageClick(entry.absoluteIndex) }
+    } else {
+        modifier
+    }
     Box(
-        modifier = modifier
+        modifier = clickableModifier
             .clip(RoundedCornerShape(12.dp))
             .background(Color(0xFF1C1F24))
     ) {
@@ -2092,22 +2306,34 @@ private fun decodeBitmapForPdf(path: String, targetWidth: Int, targetHeight: Int
     BitmapFactory.decodeFile(path, bounds)
     if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null
 
-    val requestedWidth = (targetWidth.coerceAtLeast(1) * 3).coerceAtMost(4096)
-    val requestedHeight = (targetHeight.coerceAtLeast(1) * 3).coerceAtMost(4096)
+    val safeTargetWidth = targetWidth.coerceAtLeast(1)
+    val safeTargetHeight = targetHeight.coerceAtLeast(1)
+    val requestedWidth = (safeTargetWidth * 6).coerceAtMost(8192)
+    val requestedHeight = (safeTargetHeight * 6).coerceAtMost(8192)
 
-    var sampleSize = 1
+    val widthRatio = bounds.outWidth.toFloat() / requestedWidth.toFloat()
+    val heightRatio = bounds.outHeight.toFloat() / requestedHeight.toFloat()
+    var sampleSize = maxOf(widthRatio, heightRatio).toInt().coerceAtLeast(1)
+
+    fun decodeWithSample(size: Int): Bitmap? {
+        val options = BitmapFactory.Options().apply {
+            inSampleSize = size.coerceAtLeast(1)
+            inPreferredConfig = Bitmap.Config.ARGB_8888
+        }
+        return BitmapFactory.decodeFile(path, options)
+    }
+
+    var bitmap = decodeWithSample(sampleSize)
     while (
-        bounds.outWidth / sampleSize > requestedWidth ||
-        bounds.outHeight / sampleSize > requestedHeight
+        bitmap != null &&
+        sampleSize > 1 &&
+        (bitmap.width < safeTargetWidth * 2 || bitmap.height < safeTargetHeight * 2)
     ) {
-        sampleSize *= 2
+        bitmap.recycle()
+        sampleSize = (sampleSize / 2).coerceAtLeast(1)
+        bitmap = decodeWithSample(sampleSize)
     }
-
-    val options = BitmapFactory.Options().apply {
-        inSampleSize = sampleSize
-        inPreferredConfig = Bitmap.Config.ARGB_8888
-    }
-    return BitmapFactory.decodeFile(path, options)
+    return bitmap
 }
 
 private fun drawRoundedBitmap(
