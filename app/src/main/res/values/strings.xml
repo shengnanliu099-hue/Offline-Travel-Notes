@@ -1,7 +1,7 @@
 <resources>
-    <string name="app_name">Travel Notes</string>
-    <string name="header_title">Travel Notes</string>
-    <string name="header_subtitle">Offline journal · Multi-image · #Tag Search</string>
+    <string name="app_name">Note Anytime</string>
+    <string name="header_title">Note Anytime</string>
+    <string name="header_subtitle">Offline journal · Photos &amp; Camera · #Tag Search</string>
     <string name="search_hint">Search by #tag or keyword</string>
     <string name="cd_search">Search</string>
     <string name="cd_add_note">Create note</string>
@@ -9,17 +9,37 @@
     <string name="editor_new_title">New Note</string>
     <string name="editor_editing_title">Edit Note</string>
     <string name="editor_editing_notice">You are editing an existing note</string>
+    <string name="btn_focus_mode_on">Focus</string>
+    <string name="btn_focus_mode_off">Exit Focus</string>
+    <string name="hint_focus_mode">Focus mode keeps only writing area visible.</string>
     <string name="overlay_create_title">Create Note</string>
     <string name="overlay_edit_title">Edit Note</string>
     <string name="label_title">Title</string>
     <string name="label_content_with_hint">Content (example: #travel #tokyo)</string>
     <string name="hint_drag_to_sort">Long-press and drag images to reorder</string>
+    <string name="label_image_layout_mode">Image Layout</string>
+    <string name="hint_image_layout_mode">Default is Auto. You can switch layout style for each note.</string>
+    <string name="layout_mode_auto">Auto</string>
+    <string name="layout_mode_small">Small Grid</string>
+    <string name="layout_mode_two_columns">2-Column</string>
+    <string name="layout_mode_large_single">Single Large</string>
+    <string name="layout_mode_large_first">First Photo Large</string>
+    <string name="layout_mode_large_last">Last Photo Large</string>
     <string name="hint_tap_to_open">Tap to open details</string>
     <string name="empty_notes_title">No notes yet</string>
     <string name="empty_notes_hint">Tap the + button in the bottom-right to create your first note.</string>
 
     <string name="cd_pick_photos">Pick photos</string>
     <string name="btn_add_photos">Add Photos</string>
+    <string name="cd_take_photo">Take photo</string>
+    <string name="btn_take_photo">Take Photo</string>
+    <string name="camera_capture_preview_title">Use this photo?</string>
+    <string name="btn_use_photo">Use Photo</string>
+    <string name="btn_processing">Processing...</string>
+    <string name="btn_discard_photo">Discard</string>
+    <string name="msg_camera_unavailable">Camera is unavailable right now.</string>
+    <string name="msg_camera_save_failed">Could not save photo to system album. Please try again.</string>
+
     <string name="btn_cancel">Cancel</string>
     <string name="cd_save">Save</string>
     <string name="btn_save">Save</string>
@@ -35,4 +55,22 @@
     <string name="cd_delete">Delete</string>
     <string name="btn_delete">Delete</string>
     <string name="cd_close">Close</string>
+
+    <string name="cd_share_pdf">Share PDF</string>
+    <string name="btn_share_pdf">Share PDF</string>
+    <string name="share_pdf_title">Share this note as PDF</string>
+    <string name="btn_share_pdf_with_watermark">Share PDF (with watermark)</string>
+    <string name="btn_share_pdf_without_watermark">Share PDF (no watermark)</string>
+    <string name="btn_share_pdf_generate">Generate &amp; Share PDF</string>
+    <string name="label_pdf_paper_size">Paper Mode</string>
+    <string name="pdf_paper_auto">Auto</string>
+    <string name="pdf_paper_small">Small Card</string>
+    <string name="pdf_paper_medium">Medium Card</string>
+    <string name="pdf_paper_large">Large Card</string>
+    <string name="label_pdf_watermark">Watermark (with app name)</string>
+    <string name="pdf_watermark_on">On</string>
+    <string name="pdf_watermark_off">Off</string>
+    <string name="share_pdf_chooser_title">Share note PDF</string>
+    <string name="msg_share_pdf_failed">Could not create PDF. Please try again.</string>
+    <string name="pdf_watermark_text">Make notes anytime to record your life, no matter good or bad :)</string>
 </resources>

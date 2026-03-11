@@ -21,6 +21,7 @@ class NoteDatabaseHelper(context: Context) :
                 $COL_TITLE TEXT NOT NULL,
                 $COL_CONTENT TEXT NOT NULL,
                 $COL_TAGS TEXT NOT NULL,
+                $COL_IMAGE_LAYOUT_MODE TEXT NOT NULL DEFAULT '${ImageLayoutMode.AUTO.storageValue}',
                 $COL_UPDATED_AT INTEGER NOT NULL
             )
             """.trimIndent()
@@ -44,26 +45,65 @@ class NoteDatabaseHelper(context: Context) :
     }
 
     override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
-        db.execSQL("DROP TABLE IF EXISTS $TABLE_NOTE_IMAGES")
-        db.execSQL("DROP TABLE IF EXISTS $TABLE_NOTES")
-        onCreate(db)
+        var currentVersion = oldVersion
+
+        if (currentVersion < 3) {
+            val result = runCatching {
+                db.execSQL(
+                    "ALTER TABLE $TABLE_NOTES ADD COLUMN $COL_IMAGE_LAYOUT_MODE TEXT NOT NULL DEFAULT '${ImageLayoutMode.AUTO.storageValue}'"
+                )
+            }
+            if (result.isFailure) {
+                val message = result.exceptionOrNull()?.message.orEmpty()
+                val isDuplicateColumn = message.contains("duplicate", ignoreCase = true) &&
+                    message.contains(COL_IMAGE_LAYOUT_MODE, ignoreCase = true)
+                if (!isDuplicateColumn) {
+                    db.execSQL("DROP TABLE IF EXISTS $TABLE_NOTE_IMAGES")
+                    db.execSQL("DROP TABLE IF EXISTS $TABLE_NOTES")
+                    onCreate(db)
+                    return
+                }
+            }
+            currentVersion = 3
+        }
+
+        if (currentVersion < newVersion) {
+            db.execSQL("DROP TABLE IF EXISTS $TABLE_NOTE_IMAGES")
+            db.execSQL("DROP TABLE IF EXISTS $TABLE_NOTES")
+            onCreate(db)
+        }
     }
 
-    fun insertNote(title: String, content: String, tagsCsv: String, updatedAt: Long): Long {
+    fun insertNote(
+        title: String,
+        content: String,
+        tagsCsv: String,
+        imageLayoutMode: ImageLayoutMode,
+        updatedAt: Long
+    ): Long {
         val values = ContentValues().apply {
             put(COL_TITLE, title)
             put(COL_CONTENT, content)
             put(COL_TAGS, tagsCsv)
+            put(COL_IMAGE_LAYOUT_MODE, imageLayoutMode.storageValue)
             put(COL_UPDATED_AT, updatedAt)
         }
         return writableDatabase.insert(TABLE_NOTES, null, values)
     }
 
-    fun updateNote(noteId: Long, title: String, content: String, tagsCsv: String, updatedAt: Long) {
+    fun updateNote(
+        noteId: Long,
+        title: String,
+        content: String,
+        tagsCsv: String,
+        imageLayoutMode: ImageLayoutMode,
+        updatedAt: Long
+    ) {
         val values = ContentValues().apply {
             put(COL_TITLE, title)
             put(COL_CONTENT, content)
             put(COL_TAGS, tagsCsv)
+            put(COL_IMAGE_LAYOUT_MODE, imageLayoutMode.storageValue)
             put(COL_UPDATED_AT, updatedAt)
         }
         writableDatabase.update(
@@ -139,6 +179,7 @@ class NoteDatabaseHelper(context: Context) :
             val titleIndex = it.getColumnIndexOrThrow(COL_TITLE)
             val contentIndex = it.getColumnIndexOrThrow(COL_CONTENT)
             val tagsIndex = it.getColumnIndexOrThrow(COL_TAGS)
+            val imageLayoutModeIndex = it.getColumnIndex(COL_IMAGE_LAYOUT_MODE)
             val updatedAtIndex = it.getColumnIndexOrThrow(COL_UPDATED_AT)
 
             while (it.moveToNext()) {
@@ -154,6 +195,9 @@ class NoteDatabaseHelper(context: Context) :
                     title = it.getString(titleIndex),
                     content = it.getString(contentIndex),
                     imagePaths = loadNoteImagePaths(id),
+                    imageLayoutMode = ImageLayoutMode.fromStorage(
+                        if (imageLayoutModeIndex >= 0) it.getString(imageLayoutModeIndex) else null
+                    ),
                     tags = tags,
                     updatedAt = it.getLong(updatedAtIndex)
                 )
@@ -164,7 +208,7 @@ class NoteDatabaseHelper(context: Context) :
 
     companion object {
         private const val DATABASE_NAME = "notes.db"
-        private const val DATABASE_VERSION = 2
+        private const val DATABASE_VERSION = 3
 
         private const val TABLE_NOTES = "notes"
         private const val TABLE_NOTE_IMAGES = "note_images"
@@ -173,6 +217,7 @@ class NoteDatabaseHelper(context: Context) :
         private const val COL_TITLE = "title"
         private const val COL_CONTENT = "content"
         private const val COL_TAGS = "tags"
+        private const val COL_IMAGE_LAYOUT_MODE = "image_layout_mode"
         private const val COL_UPDATED_AT = "updated_at"
 
         private const val COL_IMAGE_ID = "id"

@@ -9,12 +9,18 @@ import java.util.UUID
 class NoteRepository(private val context: Context) {
     private val dbHelper = NoteDatabaseHelper(context)
 
-    fun addNote(title: String, content: String, imageUris: List<Uri>) {
+    fun addNote(
+        title: String,
+        content: String,
+        imageUris: List<Uri>,
+        imageLayoutMode: ImageLayoutMode
+    ) {
         val tags = extractTags("$title\n$content")
         val noteId = dbHelper.insertNote(
             title = title,
             content = content,
             tagsCsv = tags.joinToString(","),
+            imageLayoutMode = imageLayoutMode,
             updatedAt = System.currentTimeMillis()
         )
 
@@ -27,7 +33,8 @@ class NoteRepository(private val context: Context) {
         title: String,
         content: String,
         keptImagePaths: List<String>,
-        newImageUris: List<Uri>
+        newImageUris: List<Uri>,
+        imageLayoutMode: ImageLayoutMode
     ) {
         val tags = extractTags("$title\n$content")
         val oldImagePaths = dbHelper.loadNoteImagePaths(noteId)
@@ -39,6 +46,7 @@ class NoteRepository(private val context: Context) {
             title = title,
             content = content,
             tagsCsv = tags.joinToString(","),
+            imageLayoutMode = imageLayoutMode,
             updatedAt = System.currentTimeMillis()
         )
         dbHelper.replaceNoteImages(noteId, finalImagePaths)

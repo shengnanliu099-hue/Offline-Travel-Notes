@@ -5,6 +5,7 @@ data class Note(
     val title: String,
     val content: String,
     val imagePaths: List<String>,
+    val imageLayoutMode: ImageLayoutMode,
     val tags: List<String>,
     val updatedAt: Long
 )

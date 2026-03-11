@@ -6,6 +6,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.AndroidViewModel
+import com.travelnotes.offline.data.ImageLayoutMode
 import com.travelnotes.offline.data.Note
 import com.travelnotes.offline.data.NoteRepository
 
@@ -39,6 +40,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         private set
 
     var draftImages by mutableStateOf<List<DraftImage>>(emptyList())
+        private set
+
+    var selectedImageLayoutMode by mutableStateOf(ImageLayoutMode.AUTO)
         private set
 
     var editingNoteId by mutableStateOf<Long?>(null)
@@ -82,10 +86,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             )
         }
         draftImages = draftImages + newItems
+        normalizeSelectedLayoutMode()
     }
 
     fun removeDraftImage(image: DraftImage) {
         draftImages = draftImages.filterNot { it.id == image.id }
+        normalizeSelectedLayoutMode()
     }
 
     fun moveDraftImage(fromIndex: Int, toIndex: Int) {
@@ -108,7 +114,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 path = path
             )
         }
+        selectedImageLayoutMode = note.imageLayoutMode
+        normalizeSelectedLayoutMode()
         isComposerVisible = true
+    }
+
+    fun onImageLayoutModeChange(mode: ImageLayoutMode) {
+        selectedImageLayoutMode = mode
+        normalizeSelectedLayoutMode()
     }
 
     fun cancelEdit() {
@@ -133,7 +146,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             repository.addNote(
                 title = cleanTitle,
                 content = cleanContent,
-                imageUris = newUris
+                imageUris = newUris,
+                imageLayoutMode = selectedImageLayoutMode
             )
         } else {
             repository.updateNote(
@@ -141,7 +155,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 title = cleanTitle,
                 content = cleanContent,
                 keptImagePaths = keptPaths,
-                newImageUris = newUris
+                newImageUris = newUris,
+                imageLayoutMode = selectedImageLayoutMode
             )
         }
 
@@ -164,6 +179,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         titleInput = ""
         contentInput = ""
         draftImages = emptyList()
+        selectedImageLayoutMode = ImageLayoutMode.AUTO
     }
 
     private fun refreshNotes() {
@@ -173,6 +189,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private fun nextDraftImageId(prefix: String): String {
         draftImageCounter += 1
         return "$prefix-${System.currentTimeMillis()}-$draftImageCounter"
+    }
+
+    private fun normalizeSelectedLayoutMode() {
+        val availableModes = ImageLayoutMode.availableForImageCount(draftImages.size)
+        if (selectedImageLayoutMode !in availableModes) {
+            selectedImageLayoutMode = ImageLayoutMode.AUTO
+        }
     }
 
     companion object {

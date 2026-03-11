@@ -1,7 +1,7 @@
 <resources>
-    <string name="app_name">离线手帐</string>
-    <string name="header_title">离线手帐</string>
-    <string name="header_subtitle">离线记录 · 多图笔记 · #标签搜索</string>
+    <string name="app_name">随手记</string>
+    <string name="header_title">随手记</string>
+    <string name="header_subtitle">随时记录 · 相册与拍照 · #标签搜索</string>
     <string name="search_hint">搜索 #标签 或关键词</string>
     <string name="cd_search">搜索</string>
     <string name="cd_add_note">创建笔记</string>
@@ -9,17 +9,37 @@
     <string name="editor_new_title">新建笔记</string>
     <string name="editor_editing_title">编辑笔记</string>
     <string name="editor_editing_notice">你正在编辑已有笔记</string>
+    <string name="btn_focus_mode_on">专注模式</string>
+    <string name="btn_focus_mode_off">退出专注</string>
+    <string name="hint_focus_mode">专注模式下仅保留写作区域，减少遮挡。</string>
     <string name="overlay_create_title">创建笔记</string>
     <string name="overlay_edit_title">编辑笔记</string>
     <string name="label_title">标题</string>
     <string name="label_content_with_hint">内容（示例：#旅行 #东京）</string>
     <string name="hint_drag_to_sort">长按图片并拖拽可排序</string>
+    <string name="label_image_layout_mode">图片布局</string>
+    <string name="hint_image_layout_mode">默认“自动”，你可以为每条笔记单独选择展示方式。</string>
+    <string name="layout_mode_auto">自动</string>
+    <string name="layout_mode_small">小图网格</string>
+    <string name="layout_mode_two_columns">2列布局</string>
+    <string name="layout_mode_large_single">单图大图</string>
+    <string name="layout_mode_large_first">首图大图</string>
+    <string name="layout_mode_large_last">末图大图</string>
     <string name="hint_tap_to_open">点击打开详情</string>
     <string name="empty_notes_title">还没有笔记</string>
     <string name="empty_notes_hint">点击右下角 + 按钮创建第一条笔记。</string>
 
     <string name="cd_pick_photos">选择图片</string>
     <string name="btn_add_photos">添加相册图片</string>
+    <string name="cd_take_photo">拍照</string>
+    <string name="btn_take_photo">拍照添加</string>
+    <string name="camera_capture_preview_title">使用这张照片吗？</string>
+    <string name="btn_use_photo">确认使用</string>
+    <string name="btn_processing">处理中...</string>
+    <string name="btn_discard_photo">丢弃</string>
+    <string name="msg_camera_unavailable">暂时无法调用相机。</string>
+    <string name="msg_camera_save_failed">保存到系统相册失败，请重试。</string>
+
     <string name="btn_cancel">取消</string>
     <string name="cd_save">保存</string>
     <string name="btn_save">保存</string>
@@ -35,4 +55,22 @@
     <string name="cd_delete">删除</string>
     <string name="btn_delete">删除</string>
     <string name="cd_close">关闭</string>
+
+    <string name="cd_share_pdf">分享PDF</string>
+    <string name="btn_share_pdf">分享PDF</string>
+    <string name="share_pdf_title">将这条笔记分享为 PDF</string>
+    <string name="btn_share_pdf_with_watermark">分享 PDF（带水印）</string>
+    <string name="btn_share_pdf_without_watermark">分享 PDF（无水印）</string>
+    <string name="btn_share_pdf_generate">生成并分享 PDF</string>
+    <string name="label_pdf_paper_size">纸张模式</string>
+    <string name="pdf_paper_auto">自动</string>
+    <string name="pdf_paper_small">小卡片</string>
+    <string name="pdf_paper_medium">中卡片</string>
+    <string name="pdf_paper_large">大卡片</string>
+    <string name="label_pdf_watermark">水印（含应用名）</string>
+    <string name="pdf_watermark_on">开启</string>
+    <string name="pdf_watermark_off">关闭</string>
+    <string name="share_pdf_chooser_title">分享笔记 PDF</string>
+    <string name="msg_share_pdf_failed">生成 PDF 失败，请重试。</string>
+    <string name="pdf_watermark_text">Make notes anytime to record your life, no matter good or bad :)</string>
 </resources>
