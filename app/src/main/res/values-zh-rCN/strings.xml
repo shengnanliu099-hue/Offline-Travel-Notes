@@ -2,6 +2,10 @@
     <string name="app_name">随手记</string>
     <string name="header_title">随手记</string>
     <string name="header_subtitle">随时记录 · 相册与拍照 · #标签搜索</string>
+    <string name="label_app_theme">应用主题</string>
+    <string name="app_theme_follow_system">跟随系统</string>
+    <string name="app_theme_black">黑色</string>
+    <string name="app_theme_white">白色</string>
     <string name="search_hint">搜索 #标签 或关键词</string>
     <string name="cd_search">搜索</string>
     <string name="cd_add_note">创建笔记</string>
@@ -70,6 +74,9 @@
     <string name="label_pdf_quality">导出画质</string>
     <string name="pdf_quality_standard">标准</string>
     <string name="pdf_quality_ultra">超清</string>
+    <string name="label_pdf_style">PDF 卡片样式</string>
+    <string name="pdf_style_color">彩色</string>
+    <string name="pdf_style_monochrome">黑白</string>
     <string name="label_pdf_watermark">水印（含应用名）</string>
     <string name="pdf_watermark_on">开启</string>
     <string name="pdf_watermark_off">关闭</string>

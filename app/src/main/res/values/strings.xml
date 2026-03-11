@@ -2,6 +2,10 @@
     <string name="app_name">Note Anytime</string>
     <string name="header_title">Note Anytime</string>
     <string name="header_subtitle">Offline journal · Photos &amp; Camera · #Tag Search</string>
+    <string name="label_app_theme">App Theme</string>
+    <string name="app_theme_follow_system">Follow System</string>
+    <string name="app_theme_black">Black</string>
+    <string name="app_theme_white">White</string>
     <string name="search_hint">Search by #tag or keyword</string>
     <string name="cd_search">Search</string>
     <string name="cd_add_note">Create note</string>
@@ -70,6 +74,9 @@
     <string name="label_pdf_quality">Export Quality</string>
     <string name="pdf_quality_standard">Standard</string>
     <string name="pdf_quality_ultra">Ultra HD</string>
+    <string name="label_pdf_style">PDF Card Style</string>
+    <string name="pdf_style_color">Color</string>
+    <string name="pdf_style_monochrome">Black &amp; White</string>
     <string name="label_pdf_watermark">Watermark (with app name)</string>
     <string name="pdf_watermark_on">On</string>
     <string name="pdf_watermark_off">Off</string>
