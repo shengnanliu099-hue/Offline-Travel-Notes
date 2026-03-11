@@ -56,12 +56,20 @@ class NoteRepository(private val context: Context) {
     }
 
     fun deleteNote(note: Note) {
+        dbHelper.markNoteDeleted(note.id, System.currentTimeMillis())
+    }
+
+    fun restoreNote(note: Note) {
+        dbHelper.restoreNote(note.id, System.currentTimeMillis())
+    }
+
+    fun deleteNotePermanently(note: Note) {
         dbHelper.deleteNote(note.id)
         deleteFiles(note.imagePaths)
     }
 
-    fun getNotes(searchQuery: String): List<Note> {
-        val allNotes = dbHelper.loadAllNotes()
+    fun getNotes(searchQuery: String, inRecycleBin: Boolean): List<Note> {
+        val allNotes = dbHelper.loadAllNotes(onlyDeleted = inRecycleBin)
         val query = searchQuery.trim().lowercase(Locale.ROOT)
         if (query.isBlank()) return allNotes
 

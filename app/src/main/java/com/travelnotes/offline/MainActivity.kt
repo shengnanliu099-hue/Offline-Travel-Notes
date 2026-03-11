@@ -86,6 +86,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.FabPosition
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
@@ -275,6 +276,8 @@ private fun TravelNotesScreen(
     var imageViewerPaths by remember { mutableStateOf<List<String>>(emptyList()) }
     var imageViewerInitialIndex by remember { mutableStateOf(0) }
     var isSettingsVisible by remember { mutableStateOf(false) }
+    var notePendingDeletion by remember { mutableStateOf<Note?>(null) }
+    var pendingPermanentDelete by remember { mutableStateOf(false) }
 
     val pickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.PickMultipleVisualMedia(MainViewModel.MAX_IMAGE_PICKER_SELECTION)
@@ -306,7 +309,9 @@ private fun TravelNotesScreen(
         capturedPreviewUri != null ||
         noteForPdfShare != null ||
         viewModel.isComposerVisible ||
-        openedNoteId != null
+        openedNoteId != null ||
+        notePendingDeletion != null ||
+        viewModel.isRecycleBinVisible
     BackHandler(enabled = hasOverlayToClose) {
         when {
             imageViewerPaths.isNotEmpty() -> {
@@ -326,8 +331,13 @@ private fun TravelNotesScreen(
                     noteForPdfShare = null
                 }
             }
+            notePendingDeletion != null -> {
+                notePendingDeletion = null
+                pendingPermanentDelete = false
+            }
             viewModel.isComposerVisible -> viewModel.cancelEdit()
             openedNoteId != null -> openedNoteId = null
+            viewModel.isRecycleBinVisible -> viewModel.showRecycleBin(false)
         }
     }
 
@@ -351,6 +361,7 @@ private fun TravelNotesScreen(
                 FloatingActionButton(
                     onClick = {
                         openedNoteId = null
+                        viewModel.showRecycleBin(false)
                         viewModel.startCreate()
                     },
                     containerColor = if (isDarkMode) Color(0xFFEDF2F8) else Color(0xFF121316),
@@ -373,6 +384,11 @@ private fun TravelNotesScreen(
                 item {
                     HeaderSection(
                         isDarkMode = isDarkMode,
+                        isRecycleBinVisible = viewModel.isRecycleBinVisible,
+                        onToggleRecycleBin = {
+                            openedNoteId = null
+                            viewModel.toggleRecycleBin()
+                        },
                         onOpenSettings = { isSettingsVisible = true }
                     )
                 }
@@ -402,12 +418,15 @@ private fun TravelNotesScreen(
                 }
 
                 item {
-                    HorizontalDivider(color = Color(0xFF2B2C30))
+                    HorizontalDivider(color = if (isDarkMode) Color(0xFF2B2C30) else Color(0xFFD3DAE5))
                 }
 
                 if (viewModel.notes.isEmpty()) {
                     item {
-                        EmptyStateCard(isDarkMode = isDarkMode)
+                        EmptyStateCard(
+                            isDarkMode = isDarkMode,
+                            isRecycleBinVisible = viewModel.isRecycleBinVisible
+                        )
                     }
                 } else {
                     itemsIndexed(viewModel.notes, key = { _, note -> note.id }) { index, note ->
@@ -428,6 +447,8 @@ private fun TravelNotesScreen(
 
         NoteDetailOverlay(
             note = openedNote,
+            isDarkMode = isDarkMode,
+            isRecycleBinMode = viewModel.isRecycleBinVisible,
             onDismiss = { openedNoteId = null },
             onEdit = {
                 openedNoteId = null
@@ -435,7 +456,17 @@ private fun TravelNotesScreen(
             },
             onDelete = {
                 openedNoteId = null
-                viewModel.deleteNote(it)
+                pendingPermanentDelete = false
+                notePendingDeletion = it
+            },
+            onRestore = {
+                openedNoteId = null
+                viewModel.restoreNote(it)
+            },
+            onDeletePermanently = {
+                openedNoteId = null
+                pendingPermanentDelete = true
+                notePendingDeletion = it
             },
             onShare = { noteForPdfShare = it },
             onImageClick = { imagePaths, index ->
@@ -446,6 +477,7 @@ private fun TravelNotesScreen(
 
         SharePdfOptionsOverlay(
             note = noteForPdfShare,
+            isDarkMode = isDarkMode,
             isSharing = isSharingPdf,
             onDismiss = {
                 if (!isSharingPdf) {
@@ -484,6 +516,7 @@ private fun TravelNotesScreen(
 
         EditorOverlay(
             visible = viewModel.isComposerVisible,
+            isDarkMode = isDarkMode,
             isEditing = viewModel.isEditing,
             title = viewModel.titleInput,
             content = viewModel.contentInput,
@@ -519,6 +552,7 @@ private fun TravelNotesScreen(
 
         CapturedPhotoConfirmOverlay(
             photoUri = capturedPreviewUri,
+            isDarkMode = isDarkMode,
             isProcessing = isConfirmingCapturedPhoto,
             onConfirm = {
                 val sourceFile = capturedPreviewFile ?: return@CapturedPhotoConfirmOverlay
@@ -567,12 +601,70 @@ private fun TravelNotesScreen(
             onThemeModeChange = onThemeModeChange,
             onDismiss = { isSettingsVisible = false }
         )
+
+        val pendingDeleteNote = notePendingDeletion
+        if (pendingDeleteNote != null) {
+            AlertDialog(
+                onDismissRequest = {
+                    notePendingDeletion = null
+                    pendingPermanentDelete = false
+                },
+                title = {
+                    Text(
+                        text = stringResource(R.string.delete_confirm_title)
+                    )
+                },
+                text = {
+                    Text(
+                        text = if (pendingPermanentDelete) {
+                            stringResource(R.string.delete_confirm_permanent_message)
+                        } else {
+                            stringResource(R.string.delete_confirm_move_to_bin_message)
+                        }
+                    )
+                },
+                confirmButton = {
+                    TextButton(
+                        onClick = {
+                            if (pendingPermanentDelete) {
+                                viewModel.deleteNotePermanently(pendingDeleteNote)
+                            } else {
+                                viewModel.deleteNote(pendingDeleteNote)
+                            }
+                            notePendingDeletion = null
+                            pendingPermanentDelete = false
+                        }
+                    ) {
+                        Text(
+                            text = if (pendingPermanentDelete) {
+                                stringResource(R.string.btn_delete_forever)
+                            } else {
+                                stringResource(R.string.btn_move_to_bin)
+                            },
+                            color = Color(0xFFE35A5A)
+                        )
+                    }
+                },
+                dismissButton = {
+                    TextButton(
+                        onClick = {
+                            notePendingDeletion = null
+                            pendingPermanentDelete = false
+                        }
+                    ) {
+                        Text(stringResource(R.string.btn_cancel))
+                    }
+                }
+            )
+        }
     }
 }
 
 @Composable
 private fun HeaderSection(
     isDarkMode: Boolean,
+    isRecycleBinVisible: Boolean,
+    onToggleRecycleBin: () -> Unit,
     onOpenSettings: () -> Unit
 ) {
     Column(
@@ -607,16 +699,37 @@ private fun HeaderSection(
                 fontWeight = FontWeight.ExtraBold,
                 letterSpacing = 0.4.sp
             )
-            IconButton(onClick = onOpenSettings) {
-                Icon(
-                    imageVector = Icons.Default.Settings,
-                    contentDescription = stringResource(R.string.cd_settings),
-                    tint = if (isDarkMode) Color(0xFFD9E2EE) else Color(0xFF2D3A4B)
-                )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                IconButton(onClick = onToggleRecycleBin) {
+                    Icon(
+                        imageVector = if (isRecycleBinVisible) Icons.Default.Close else Icons.Default.DeleteOutline,
+                        contentDescription = if (isRecycleBinVisible) {
+                            stringResource(R.string.cd_close_recycle_bin)
+                        } else {
+                            stringResource(R.string.cd_recycle_bin)
+                        },
+                        tint = if (isRecycleBinVisible) {
+                            if (isDarkMode) Color(0xFFFFA3A3) else Color(0xFFC23A3A)
+                        } else {
+                            if (isDarkMode) Color(0xFFD9E2EE) else Color(0xFF2D3A4B)
+                        }
+                    )
+                }
+                IconButton(onClick = onOpenSettings) {
+                    Icon(
+                        imageVector = Icons.Default.Settings,
+                        contentDescription = stringResource(R.string.cd_settings),
+                        tint = if (isDarkMode) Color(0xFFD9E2EE) else Color(0xFF2D3A4B)
+                    )
+                }
             }
         }
         Text(
-            text = stringResource(R.string.header_subtitle),
+            text = if (isRecycleBinVisible) {
+                stringResource(R.string.header_subtitle_recycle_bin)
+            } else {
+                stringResource(R.string.header_subtitle)
+            },
             style = MaterialTheme.typography.bodyMedium,
             color = if (isDarkMode) Color(0xFF9DA4AE) else Color(0xFF495060),
             modifier = Modifier.padding(top = 4.dp)
@@ -625,7 +738,10 @@ private fun HeaderSection(
 }
 
 @Composable
-private fun EmptyStateCard(isDarkMode: Boolean) {
+private fun EmptyStateCard(
+    isDarkMode: Boolean,
+    isRecycleBinVisible: Boolean
+) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -642,14 +758,22 @@ private fun EmptyStateCard(isDarkMode: Boolean) {
     ) {
         Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 20.dp)) {
             Text(
-                text = stringResource(R.string.empty_notes_title),
+                text = if (isRecycleBinVisible) {
+                    stringResource(R.string.empty_recycle_bin_title)
+                } else {
+                    stringResource(R.string.empty_notes_title)
+                },
                 color = if (isDarkMode) Color.White else Color(0xFF111317),
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.SemiBold
             )
             Spacer(modifier = Modifier.height(6.dp))
             Text(
-                text = stringResource(R.string.empty_notes_hint),
+                text = if (isRecycleBinVisible) {
+                    stringResource(R.string.empty_recycle_bin_hint)
+                } else {
+                    stringResource(R.string.empty_notes_hint)
+                },
                 color = if (isDarkMode) Color(0xFFA6ADBA) else Color(0xFF5C6575),
                 style = MaterialTheme.typography.bodyMedium
             )
@@ -747,12 +871,19 @@ private fun SettingsOverlay(
 @Composable
 private fun CapturedPhotoConfirmOverlay(
     photoUri: Uri?,
+    isDarkMode: Boolean,
     isProcessing: Boolean,
     onConfirm: () -> Unit,
     onDiscard: () -> Unit
 ) {
     val uri = photoUri ?: return
     val interactionSource = remember { MutableInteractionSource() }
+    val sheetColor = if (isDarkMode) Color(0xFF111317) else Color.White
+    val titleColor = if (isDarkMode) Color.White else Color(0xFF141922)
+    val previewBackground = if (isDarkMode) Color(0xFF1B1E22) else Color(0xFFE8EDF4)
+    val discardColor = if (isDarkMode) Color(0xFFBFC7D3) else Color(0xFF415167)
+    val primaryButtonContainer = if (isDarkMode) Color(0xFFEDF2F8) else Color(0xFF1D2735)
+    val primaryButtonContent = if (isDarkMode) Color.Black else Color.White
 
     AnimatedVisibility(
         visible = true,
@@ -775,12 +906,12 @@ private fun CapturedPhotoConfirmOverlay(
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp),
                 shape = RoundedCornerShape(20.dp),
-                colors = CardDefaults.cardColors(containerColor = Color(0xFF111317))
+                colors = CardDefaults.cardColors(containerColor = sheetColor)
             ) {
                 Column(modifier = Modifier.padding(14.dp)) {
                     Text(
                         text = stringResource(R.string.camera_capture_preview_title),
-                        color = Color.White,
+                        color = titleColor,
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.SemiBold
                     )
@@ -792,7 +923,7 @@ private fun CapturedPhotoConfirmOverlay(
                             .fillMaxWidth()
                             .height(320.dp)
                             .clip(RoundedCornerShape(14.dp))
-                            .background(Color(0xFF1B1E22)),
+                            .background(previewBackground),
                         contentScale = ContentScale.Crop
                     )
                     Spacer(modifier = Modifier.height(10.dp))
@@ -805,14 +936,14 @@ private fun CapturedPhotoConfirmOverlay(
                             onClick = onDiscard,
                             enabled = !isProcessing
                         ) {
-                            Text(stringResource(R.string.btn_discard_photo), color = Color(0xFFBFC7D3))
+                            Text(stringResource(R.string.btn_discard_photo), color = discardColor)
                         }
                         Button(
                             onClick = onConfirm,
                             enabled = !isProcessing,
                             colors = ButtonDefaults.buttonColors(
-                                containerColor = Color(0xFFEDF2F8),
-                                contentColor = Color.Black
+                                containerColor = primaryButtonContainer,
+                                contentColor = primaryButtonContent
                             )
                         ) {
                             Text(
@@ -833,6 +964,7 @@ private fun CapturedPhotoConfirmOverlay(
 @Composable
 private fun SharePdfOptionsOverlay(
     note: Note?,
+    isDarkMode: Boolean,
     isSharing: Boolean,
     onDismiss: () -> Unit,
     onShare: (Note, Boolean, PdfPaperMode, PdfExportQualityMode, PdfStyleMode) -> Unit
@@ -843,6 +975,17 @@ private fun SharePdfOptionsOverlay(
     var selectedQualityMode by remember(currentNote.id) { mutableStateOf(PdfExportQualityMode.STANDARD) }
     var selectedStyleMode by remember(currentNote.id) { mutableStateOf(PdfStyleMode.FOLLOW_APP) }
     var includeWatermark by remember(currentNote.id) { mutableStateOf(true) }
+    val sheetColor = if (isDarkMode) Color(0xFF111317) else Color.White
+    val titleColor = if (isDarkMode) Color.White else Color(0xFF151922)
+    val subtitleColor = if (isDarkMode) Color(0xFF9CA5B3) else Color(0xFF5C6778)
+    val labelColor = if (isDarkMode) Color(0xFFD8DEE8) else Color(0xFF3E4A5D)
+    val chipContainerColor = if (isDarkMode) Color(0xFF2B3038) else Color(0xFFE6ECF4)
+    val chipLabelColor = if (isDarkMode) Color(0xFFD5DDE9) else Color(0xFF2E3A4E)
+    val selectedChipColor = if (isDarkMode) Color(0xFFDAEDFF) else Color(0xFF1D2735)
+    val selectedChipLabelColor = if (isDarkMode) Color.Black else Color.White
+    val primaryButtonContainer = if (isDarkMode) Color(0xFFEDF2F8) else Color(0xFF1D2735)
+    val primaryButtonContent = if (isDarkMode) Color.Black else Color.White
+    val cancelColor = if (isDarkMode) Color(0xFFC3CBD6) else Color(0xFF39485D)
 
     AnimatedVisibility(
         visible = true,
@@ -870,12 +1013,12 @@ private fun SharePdfOptionsOverlay(
                         onClick = {}
                     ),
                 shape = RoundedCornerShape(20.dp),
-                colors = CardDefaults.cardColors(containerColor = Color(0xFF111317))
+                colors = CardDefaults.cardColors(containerColor = sheetColor)
             ) {
                 Column(modifier = Modifier.padding(14.dp)) {
                     Text(
                         text = stringResource(R.string.share_pdf_title),
-                        color = Color.White,
+                        color = titleColor,
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.SemiBold
                     )
@@ -885,7 +1028,7 @@ private fun SharePdfOptionsOverlay(
                         } else {
                             currentNote.title
                         },
-                        color = Color(0xFF9CA5B3),
+                        color = subtitleColor,
                         style = MaterialTheme.typography.bodySmall,
                         modifier = Modifier.padding(top = 4.dp)
                     )
@@ -893,7 +1036,7 @@ private fun SharePdfOptionsOverlay(
 
                     Text(
                         text = stringResource(R.string.label_pdf_paper_size),
-                        color = Color(0xFFD8DEE8),
+                        color = labelColor,
                         style = MaterialTheme.typography.bodySmall
                     )
                     Spacer(modifier = Modifier.height(8.dp))
@@ -912,10 +1055,10 @@ private fun SharePdfOptionsOverlay(
                                 },
                                 enabled = !isSharing,
                                 colors = FilterChipDefaults.filterChipColors(
-                                    selectedContainerColor = Color(0xFFDAEDFF),
-                                    selectedLabelColor = Color.Black,
-                                    containerColor = Color(0xFF2B3038),
-                                    labelColor = Color(0xFFD5DDE9)
+                                    selectedContainerColor = selectedChipColor,
+                                    selectedLabelColor = selectedChipLabelColor,
+                                    containerColor = chipContainerColor,
+                                    labelColor = chipLabelColor
                                 )
                             )
                         }
@@ -924,7 +1067,7 @@ private fun SharePdfOptionsOverlay(
                     Spacer(modifier = Modifier.height(12.dp))
                     Text(
                         text = stringResource(R.string.label_pdf_quality),
-                        color = Color(0xFFD8DEE8),
+                        color = labelColor,
                         style = MaterialTheme.typography.bodySmall
                     )
                     Spacer(modifier = Modifier.height(8.dp))
@@ -936,10 +1079,10 @@ private fun SharePdfOptionsOverlay(
                                 label = { Text(pdfQualityModeLabel(mode)) },
                                 enabled = !isSharing,
                                 colors = FilterChipDefaults.filterChipColors(
-                                    selectedContainerColor = Color(0xFFDAEDFF),
-                                    selectedLabelColor = Color.Black,
-                                    containerColor = Color(0xFF2B3038),
-                                    labelColor = Color(0xFFD5DDE9)
+                                    selectedContainerColor = selectedChipColor,
+                                    selectedLabelColor = selectedChipLabelColor,
+                                    containerColor = chipContainerColor,
+                                    labelColor = chipLabelColor
                                 )
                             )
                         }
@@ -948,7 +1091,7 @@ private fun SharePdfOptionsOverlay(
                     Spacer(modifier = Modifier.height(12.dp))
                     Text(
                         text = stringResource(R.string.label_pdf_style),
-                        color = Color(0xFFD8DEE8),
+                        color = labelColor,
                         style = MaterialTheme.typography.bodySmall
                     )
                     Spacer(modifier = Modifier.height(8.dp))
@@ -970,10 +1113,10 @@ private fun SharePdfOptionsOverlay(
                                 },
                                 enabled = !isSharing,
                                 colors = FilterChipDefaults.filterChipColors(
-                                    selectedContainerColor = Color(0xFFDAEDFF),
-                                    selectedLabelColor = Color.Black,
-                                    containerColor = Color(0xFF2B3038),
-                                    labelColor = Color(0xFFD5DDE9)
+                                    selectedContainerColor = selectedChipColor,
+                                    selectedLabelColor = selectedChipLabelColor,
+                                    containerColor = chipContainerColor,
+                                    labelColor = chipLabelColor
                                 )
                             )
                         }
@@ -982,7 +1125,7 @@ private fun SharePdfOptionsOverlay(
                     Spacer(modifier = Modifier.height(12.dp))
                     Text(
                         text = stringResource(R.string.label_pdf_watermark),
-                        color = Color(0xFFD8DEE8),
+                        color = labelColor,
                         style = MaterialTheme.typography.bodySmall
                     )
                     Spacer(modifier = Modifier.height(8.dp))
@@ -993,10 +1136,10 @@ private fun SharePdfOptionsOverlay(
                             label = { Text(stringResource(R.string.pdf_watermark_on)) },
                             enabled = !isSharing,
                             colors = FilterChipDefaults.filterChipColors(
-                                selectedContainerColor = Color(0xFFDAEDFF),
-                                selectedLabelColor = Color.Black,
-                                containerColor = Color(0xFF2B3038),
-                                labelColor = Color(0xFFD5DDE9)
+                                selectedContainerColor = selectedChipColor,
+                                selectedLabelColor = selectedChipLabelColor,
+                                containerColor = chipContainerColor,
+                                labelColor = chipLabelColor
                             )
                         )
                         FilterChip(
@@ -1005,10 +1148,10 @@ private fun SharePdfOptionsOverlay(
                             label = { Text(stringResource(R.string.pdf_watermark_off)) },
                             enabled = !isSharing,
                             colors = FilterChipDefaults.filterChipColors(
-                                selectedContainerColor = Color(0xFFDAEDFF),
-                                selectedLabelColor = Color.Black,
-                                containerColor = Color(0xFF2B3038),
-                                labelColor = Color(0xFFD5DDE9)
+                                selectedContainerColor = selectedChipColor,
+                                selectedLabelColor = selectedChipLabelColor,
+                                containerColor = chipContainerColor,
+                                labelColor = chipLabelColor
                             )
                         )
                     }
@@ -1027,8 +1170,8 @@ private fun SharePdfOptionsOverlay(
                         enabled = !isSharing,
                         modifier = Modifier.fillMaxWidth(),
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = Color(0xFFEDF2F8),
-                            contentColor = Color.Black
+                            containerColor = primaryButtonContainer,
+                            contentColor = primaryButtonContent
                         )
                     ) {
                         Text(stringResource(R.string.btn_share_pdf_generate))
@@ -1039,7 +1182,7 @@ private fun SharePdfOptionsOverlay(
                         horizontalArrangement = Arrangement.End
                     ) {
                         TextButton(onClick = onDismiss, enabled = !isSharing) {
-                            Text(stringResource(R.string.btn_cancel), color = Color(0xFFC3CBD6))
+                            Text(stringResource(R.string.btn_cancel), color = cancelColor)
                         }
                     }
                 }
@@ -1051,6 +1194,7 @@ private fun SharePdfOptionsOverlay(
 @Composable
 private fun EditorOverlay(
     visible: Boolean,
+    isDarkMode: Boolean,
     isEditing: Boolean,
     title: String,
     content: String,
@@ -1067,6 +1211,8 @@ private fun EditorOverlay(
     onDismiss: () -> Unit
 ) {
     val interactionSource = remember { MutableInteractionSource() }
+    val titleColor = if (isDarkMode) Color.White else Color(0xFF141922)
+    val closeIconColor = if (isDarkMode) Color.White else Color(0xFF2D3A4B)
 
     AnimatedVisibility(
         visible = visible,
@@ -1110,7 +1256,7 @@ private fun EditorOverlay(
                         } else {
                             stringResource(R.string.overlay_create_title)
                         },
-                        color = Color.White,
+                        color = titleColor,
                         style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.SemiBold
                     )
@@ -1118,7 +1264,7 @@ private fun EditorOverlay(
                         Icon(
                             imageVector = Icons.Default.Close,
                             contentDescription = stringResource(R.string.cd_close),
-                            tint = Color.White
+                            tint = closeIconColor
                         )
                     }
                 }
@@ -1127,6 +1273,7 @@ private fun EditorOverlay(
                     modifier = Modifier
                         .fillMaxWidth()
                         .weight(1f),
+                    isDarkMode = isDarkMode,
                     isEditing = isEditing,
                     title = title,
                     content = content,
@@ -1150,14 +1297,28 @@ private fun EditorOverlay(
 @Composable
 private fun NoteDetailOverlay(
     note: Note?,
+    isDarkMode: Boolean,
+    isRecycleBinMode: Boolean,
     onDismiss: () -> Unit,
     onEdit: (Note) -> Unit,
     onDelete: (Note) -> Unit,
+    onRestore: (Note) -> Unit,
+    onDeletePermanently: (Note) -> Unit,
     onShare: (Note) -> Unit,
     onImageClick: (List<String>, Int) -> Unit
 ) {
     val currentNote = note ?: return
     val interactionSource = remember { MutableInteractionSource() }
+    val sheetColor = if (isDarkMode) Color(0xFF111317) else Color.White
+    val titleColor = if (isDarkMode) Color.White else Color(0xFF171C25)
+    val closeIconColor = if (isDarkMode) Color.White else Color(0xFF374457)
+    val metaColor = if (isDarkMode) Color(0xFF98A0AE) else Color(0xFF627186)
+    val contentColor = if (isDarkMode) Color(0xFFE5E8EE) else Color(0xFF2E3848)
+    val dividerColor = if (isDarkMode) Color(0xFF2B2E34) else Color(0xFFD9E0EA)
+    val shareColor = if (isDarkMode) Color(0xFF98D3FF) else Color(0xFF1A6FA8)
+    val editColor = if (isDarkMode) Color(0xFFCFD5DF) else Color(0xFF3A4558)
+    val deleteColor = if (isDarkMode) Color(0xFFFF8A8A) else Color(0xFFCF4747)
+    val restoreColor = if (isDarkMode) Color(0xFFA7E7B0) else Color(0xFF1F7C30)
 
     AnimatedVisibility(
         visible = true,
@@ -1185,7 +1346,7 @@ private fun NoteDetailOverlay(
                         onClick = {}
                     ),
                 shape = RoundedCornerShape(22.dp),
-                colors = CardDefaults.cardColors(containerColor = Color(0xFF111317))
+                colors = CardDefaults.cardColors(containerColor = sheetColor)
             ) {
                 Column(
                     modifier = Modifier
@@ -1204,7 +1365,7 @@ private fun NoteDetailOverlay(
                             } else {
                                 currentNote.title
                             },
-                            color = Color.White,
+                            color = titleColor,
                             style = MaterialTheme.typography.titleLarge,
                             fontWeight = FontWeight.Bold,
                             modifier = Modifier.weight(1f)
@@ -1214,14 +1375,14 @@ private fun NoteDetailOverlay(
                             Icon(
                                 imageVector = Icons.Default.Close,
                                 contentDescription = stringResource(R.string.cd_close),
-                                tint = Color.White
+                                tint = closeIconColor
                             )
                         }
                     }
 
                     Text(
                         text = formatTime(currentNote.updatedAt),
-                        color = Color(0xFF98A0AE),
+                        color = metaColor,
                         style = MaterialTheme.typography.bodySmall
                     )
 
@@ -1229,7 +1390,7 @@ private fun NoteDetailOverlay(
                         Spacer(modifier = Modifier.height(10.dp))
                         Text(
                             text = currentNote.content,
-                            color = Color(0xFFE5E8EE),
+                            color = contentColor,
                             style = MaterialTheme.typography.bodyMedium
                         )
                     }
@@ -1257,7 +1418,7 @@ private fun NoteDetailOverlay(
                     }
 
                     Spacer(modifier = Modifier.height(12.dp))
-                    HorizontalDivider(color = Color(0xFF2B2E34))
+                    HorizontalDivider(color = dividerColor)
                     Spacer(modifier = Modifier.height(6.dp))
 
                     Row(
@@ -1265,35 +1426,50 @@ private fun NoteDetailOverlay(
                         horizontalArrangement = Arrangement.End,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        TextButton(onClick = { onShare(currentNote) }) {
-                            Icon(
-                                imageVector = Icons.Default.Share,
-                                contentDescription = stringResource(R.string.cd_share_pdf),
-                                tint = Color(0xFF98D3FF)
-                            )
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text(
-                                text = stringResource(R.string.btn_share_pdf),
-                                color = Color(0xFF98D3FF)
-                            )
-                        }
-                        TextButton(onClick = { onEdit(currentNote) }) {
-                            Icon(
-                                imageVector = Icons.Default.Edit,
-                                contentDescription = stringResource(R.string.cd_edit),
-                                tint = Color(0xFFCFD5DF)
-                            )
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text(stringResource(R.string.btn_edit), color = Color(0xFFCFD5DF))
-                        }
-                        TextButton(onClick = { onDelete(currentNote) }) {
-                            Icon(
-                                imageVector = Icons.Default.DeleteOutline,
-                                contentDescription = stringResource(R.string.cd_delete),
-                                tint = Color(0xFFFF8A8A)
-                            )
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text(stringResource(R.string.btn_delete), color = Color(0xFFFF8A8A))
+                        if (isRecycleBinMode) {
+                            TextButton(onClick = { onRestore(currentNote) }) {
+                                Text(stringResource(R.string.btn_restore), color = restoreColor)
+                            }
+                            TextButton(onClick = { onDeletePermanently(currentNote) }) {
+                                Icon(
+                                    imageVector = Icons.Default.DeleteOutline,
+                                    contentDescription = stringResource(R.string.cd_delete),
+                                    tint = deleteColor
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(stringResource(R.string.btn_delete_forever), color = deleteColor)
+                            }
+                        } else {
+                            TextButton(onClick = { onShare(currentNote) }) {
+                                Icon(
+                                    imageVector = Icons.Default.Share,
+                                    contentDescription = stringResource(R.string.cd_share_pdf),
+                                    tint = shareColor
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(
+                                    text = stringResource(R.string.btn_share_pdf),
+                                    color = shareColor
+                                )
+                            }
+                            TextButton(onClick = { onEdit(currentNote) }) {
+                                Icon(
+                                    imageVector = Icons.Default.Edit,
+                                    contentDescription = stringResource(R.string.cd_edit),
+                                    tint = editColor
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(stringResource(R.string.btn_edit), color = editColor)
+                            }
+                            TextButton(onClick = { onDelete(currentNote) }) {
+                                Icon(
+                                    imageVector = Icons.Default.DeleteOutline,
+                                    contentDescription = stringResource(R.string.cd_delete),
+                                    tint = deleteColor
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(stringResource(R.string.btn_delete), color = deleteColor)
+                            }
                         }
                     }
                 }
@@ -1416,6 +1592,7 @@ private fun ZoomableViewerImage(path: String, modifier: Modifier = Modifier) {
 @OptIn(ExperimentalFoundationApi::class)
 private fun EditorCard(
     modifier: Modifier = Modifier,
+    isDarkMode: Boolean,
     isEditing: Boolean,
     title: String,
     content: String,
@@ -1435,12 +1612,23 @@ private fun EditorCard(
     var isContentFocused by remember { mutableStateOf(false) }
     val bringIntoViewRequester = remember { BringIntoViewRequester() }
     val coroutineScope = rememberCoroutineScope()
+    val cardColor = if (isDarkMode) Color(0xFF141518) else Color.White
+    val titleColor = if (isDarkMode) Color.White else Color(0xFF151A23)
+    val focusButtonColor = if (isDarkMode) Color(0xFFBFE4FF) else Color(0xFF215F93)
+    val editingNoticeColor = if (isDarkMode) Color(0xFF4DB6FF) else Color(0xFF2474B8)
+    val focusHintColor = if (isDarkMode) Color(0xFF89B8DD) else Color(0xFF4A6B8E)
+    val dragHintColor = if (isDarkMode) Color(0xFF8D96A3) else Color(0xFF5E697A)
+    val photoButtonColor = if (isDarkMode) Color(0xFFCCE7FF) else Color(0xFF2B5A86)
+    val cameraButtonColor = if (isDarkMode) Color(0xFFDFF3FF) else Color(0xFF2E628F)
+    val cancelColor = if (isDarkMode) Color(0xFFB8C0CC) else Color(0xFF3E4A5D)
+    val saveButtonContainer = if (isDarkMode) Color(0xFFEDF2F8) else Color(0xFF1D2735)
+    val saveButtonContent = if (isDarkMode) Color.Black else Color.White
 
     Card(
         modifier = modifier
             .shadow(16.dp, RoundedCornerShape(22.dp)),
         shape = RoundedCornerShape(22.dp),
-        colors = CardDefaults.cardColors(containerColor = Color(0xFF141518))
+        colors = CardDefaults.cardColors(containerColor = cardColor)
     ) {
         Column(
             modifier = Modifier
@@ -1458,7 +1646,7 @@ private fun EditorCard(
                     } else {
                         stringResource(R.string.editor_new_title)
                     },
-                    color = Color.White,
+                    color = titleColor,
                     style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.SemiBold
                 )
@@ -1469,7 +1657,7 @@ private fun EditorCard(
                         } else {
                             stringResource(R.string.btn_focus_mode_on)
                         },
-                        color = Color(0xFFBFE4FF)
+                        color = focusButtonColor
                     )
                 }
             }
@@ -1481,7 +1669,7 @@ private fun EditorCard(
             ) {
                 Text(
                     text = stringResource(R.string.editor_editing_notice),
-                    color = Color(0xFF4DB6FF),
+                    color = editingNoticeColor,
                     style = MaterialTheme.typography.bodySmall,
                     modifier = Modifier.padding(top = 2.dp)
                 )
@@ -1502,7 +1690,7 @@ private fun EditorCard(
                 Spacer(modifier = Modifier.height(6.dp))
                 Text(
                     text = stringResource(R.string.hint_focus_mode),
-                    color = Color(0xFF89B8DD),
+                    color = focusHintColor,
                     style = MaterialTheme.typography.bodySmall
                 )
                 Spacer(modifier = Modifier.height(6.dp))
@@ -1539,12 +1727,13 @@ private fun EditorCard(
                 Spacer(modifier = Modifier.height(6.dp))
                 Text(
                     text = stringResource(R.string.hint_drag_to_sort),
-                    color = Color(0xFF8D96A3),
+                    color = dragHintColor,
                     style = MaterialTheme.typography.bodySmall
                 )
                 Spacer(modifier = Modifier.height(10.dp))
                 ImageLayoutModeSelector(
                     imageCount = images.size,
+                    isDarkMode = isDarkMode,
                     selectedMode = imageLayoutMode,
                     onModeSelected = onImageLayoutModeChange
                 )
@@ -1562,20 +1751,20 @@ private fun EditorCard(
                         Icon(
                             imageVector = Icons.Default.AddPhotoAlternate,
                             contentDescription = stringResource(R.string.cd_pick_photos),
-                            tint = Color(0xFFCCE7FF)
+                            tint = photoButtonColor
                         )
                         Spacer(modifier = Modifier.width(6.dp))
-                        Text(stringResource(R.string.btn_add_photos), color = Color(0xFFCCE7FF))
+                        Text(stringResource(R.string.btn_add_photos), color = photoButtonColor)
                     }
 
                     TextButton(onClick = onTakePhoto) {
                         Icon(
                             imageVector = Icons.Default.PhotoCamera,
                             contentDescription = stringResource(R.string.cd_take_photo),
-                            tint = Color(0xFFDFF3FF)
+                            tint = cameraButtonColor
                         )
                         Spacer(modifier = Modifier.width(6.dp))
-                        Text(stringResource(R.string.btn_take_photo), color = Color(0xFFDFF3FF))
+                        Text(stringResource(R.string.btn_take_photo), color = cameraButtonColor)
                     }
                 }
                 Spacer(modifier = Modifier.height(6.dp))
@@ -1587,14 +1776,14 @@ private fun EditorCard(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 TextButton(onClick = onCancel) {
-                    Text(stringResource(R.string.btn_cancel), color = Color(0xFFB8C0CC))
+                    Text(stringResource(R.string.btn_cancel), color = cancelColor)
                 }
 
                 Button(
                     onClick = onSave,
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = Color(0xFFEDF2F8),
-                        contentColor = Color.Black
+                        containerColor = saveButtonContainer,
+                        contentColor = saveButtonContent
                     )
                 ) {
                     Icon(imageVector = Icons.Default.Save, contentDescription = stringResource(R.string.cd_save))
@@ -1615,6 +1804,7 @@ private fun EditorCard(
 @Composable
 private fun ImageLayoutModeSelector(
     imageCount: Int,
+    isDarkMode: Boolean,
     selectedMode: ImageLayoutMode,
     onModeSelected: (ImageLayoutMode) -> Unit
 ) {
@@ -1625,7 +1815,7 @@ private fun ImageLayoutModeSelector(
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text(
             text = stringResource(R.string.label_image_layout_mode),
-            color = Color(0xFFDDE3ED),
+            color = if (isDarkMode) Color(0xFFDDE3ED) else Color(0xFF334257),
             style = MaterialTheme.typography.bodySmall
         )
         LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -1635,17 +1825,17 @@ private fun ImageLayoutModeSelector(
                     onClick = { onModeSelected(mode) },
                     label = { Text(text = layoutModeLabel(mode, imageCount)) },
                     colors = FilterChipDefaults.filterChipColors(
-                        selectedContainerColor = Color(0xFFDAEDFF),
-                        selectedLabelColor = Color.Black,
-                        containerColor = Color(0xFF232830),
-                        labelColor = Color(0xFFD2D9E5)
+                        selectedContainerColor = if (isDarkMode) Color(0xFFDAEDFF) else Color(0xFF1D2735),
+                        selectedLabelColor = if (isDarkMode) Color.Black else Color.White,
+                        containerColor = if (isDarkMode) Color(0xFF232830) else Color(0xFFE4EAF3),
+                        labelColor = if (isDarkMode) Color(0xFFD2D9E5) else Color(0xFF2F3B4D)
                     )
                 )
             }
         }
         Text(
             text = stringResource(R.string.hint_image_layout_mode),
-            color = Color(0xFF8D96A3),
+            color = if (isDarkMode) Color(0xFF8D96A3) else Color(0xFF5E6979),
             style = MaterialTheme.typography.bodySmall
         )
     }

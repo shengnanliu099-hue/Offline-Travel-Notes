@@ -22,7 +22,9 @@ class NoteDatabaseHelper(context: Context) :
                 $COL_CONTENT TEXT NOT NULL,
                 $COL_TAGS TEXT NOT NULL,
                 $COL_IMAGE_LAYOUT_MODE TEXT NOT NULL DEFAULT '${ImageLayoutMode.AUTO.storageValue}',
-                $COL_UPDATED_AT INTEGER NOT NULL
+                $COL_UPDATED_AT INTEGER NOT NULL,
+                $COL_IS_DELETED INTEGER NOT NULL DEFAULT 0,
+                $COL_DELETED_AT INTEGER
             )
             """.trimIndent()
         )
@@ -67,6 +69,41 @@ class NoteDatabaseHelper(context: Context) :
             currentVersion = 3
         }
 
+        if (currentVersion < 4) {
+            val deletedFlagResult = runCatching {
+                db.execSQL(
+                    "ALTER TABLE $TABLE_NOTES ADD COLUMN $COL_IS_DELETED INTEGER NOT NULL DEFAULT 0"
+                )
+            }
+            if (deletedFlagResult.isFailure) {
+                val message = deletedFlagResult.exceptionOrNull()?.message.orEmpty()
+                val isDuplicateColumn = message.contains("duplicate", ignoreCase = true) &&
+                    message.contains(COL_IS_DELETED, ignoreCase = true)
+                if (!isDuplicateColumn) {
+                    db.execSQL("DROP TABLE IF EXISTS $TABLE_NOTE_IMAGES")
+                    db.execSQL("DROP TABLE IF EXISTS $TABLE_NOTES")
+                    onCreate(db)
+                    return
+                }
+            }
+
+            val deletedAtResult = runCatching {
+                db.execSQL("ALTER TABLE $TABLE_NOTES ADD COLUMN $COL_DELETED_AT INTEGER")
+            }
+            if (deletedAtResult.isFailure) {
+                val message = deletedAtResult.exceptionOrNull()?.message.orEmpty()
+                val isDuplicateColumn = message.contains("duplicate", ignoreCase = true) &&
+                    message.contains(COL_DELETED_AT, ignoreCase = true)
+                if (!isDuplicateColumn) {
+                    db.execSQL("DROP TABLE IF EXISTS $TABLE_NOTE_IMAGES")
+                    db.execSQL("DROP TABLE IF EXISTS $TABLE_NOTES")
+                    onCreate(db)
+                    return
+                }
+            }
+            currentVersion = 4
+        }
+
         if (currentVersion < newVersion) {
             db.execSQL("DROP TABLE IF EXISTS $TABLE_NOTE_IMAGES")
             db.execSQL("DROP TABLE IF EXISTS $TABLE_NOTES")
@@ -87,6 +124,8 @@ class NoteDatabaseHelper(context: Context) :
             put(COL_TAGS, tagsCsv)
             put(COL_IMAGE_LAYOUT_MODE, imageLayoutMode.storageValue)
             put(COL_UPDATED_AT, updatedAt)
+            put(COL_IS_DELETED, 0)
+            putNull(COL_DELETED_AT)
         }
         return writableDatabase.insert(TABLE_NOTES, null, values)
     }
@@ -162,16 +201,56 @@ class NoteDatabaseHelper(context: Context) :
         )
     }
 
-    fun loadAllNotes(): List<Note> {
+    fun markNoteDeleted(noteId: Long, deletedAt: Long) {
+        val values = ContentValues().apply {
+            put(COL_IS_DELETED, 1)
+            put(COL_DELETED_AT, deletedAt)
+        }
+        writableDatabase.update(
+            TABLE_NOTES,
+            values,
+            "$COL_ID = ?",
+            arrayOf(noteId.toString())
+        )
+    }
+
+    fun restoreNote(noteId: Long, updatedAt: Long) {
+        val values = ContentValues().apply {
+            put(COL_IS_DELETED, 0)
+            putNull(COL_DELETED_AT)
+            put(COL_UPDATED_AT, updatedAt)
+        }
+        writableDatabase.update(
+            TABLE_NOTES,
+            values,
+            "$COL_ID = ?",
+            arrayOf(noteId.toString())
+        )
+    }
+
+    fun loadAllNotes(
+        includeDeleted: Boolean = false,
+        onlyDeleted: Boolean = false
+    ): List<Note> {
         val notes = mutableListOf<Note>()
+        val selection = when {
+            onlyDeleted -> "$COL_IS_DELETED = 1"
+            includeDeleted -> null
+            else -> "$COL_IS_DELETED = 0"
+        }
+        val orderBy = if (onlyDeleted) {
+            "$COL_DELETED_AT DESC, $COL_UPDATED_AT DESC"
+        } else {
+            "$COL_UPDATED_AT DESC"
+        }
         val cursor = readableDatabase.query(
             TABLE_NOTES,
             null,
+            selection,
             null,
             null,
             null,
-            null,
-            "$COL_UPDATED_AT DESC"
+            orderBy
         )
 
         cursor.use {
@@ -181,6 +260,8 @@ class NoteDatabaseHelper(context: Context) :
             val tagsIndex = it.getColumnIndexOrThrow(COL_TAGS)
             val imageLayoutModeIndex = it.getColumnIndex(COL_IMAGE_LAYOUT_MODE)
             val updatedAtIndex = it.getColumnIndexOrThrow(COL_UPDATED_AT)
+            val isDeletedIndex = it.getColumnIndex(COL_IS_DELETED)
+            val deletedAtIndex = it.getColumnIndex(COL_DELETED_AT)
 
             while (it.moveToNext()) {
                 val id = it.getLong(idIndex)
@@ -199,7 +280,13 @@ class NoteDatabaseHelper(context: Context) :
                         if (imageLayoutModeIndex >= 0) it.getString(imageLayoutModeIndex) else null
                     ),
                     tags = tags,
-                    updatedAt = it.getLong(updatedAtIndex)
+                    updatedAt = it.getLong(updatedAtIndex),
+                    isDeleted = if (isDeletedIndex >= 0) it.getInt(isDeletedIndex) == 1 else false,
+                    deletedAt = if (deletedAtIndex >= 0 && !it.isNull(deletedAtIndex)) {
+                        it.getLong(deletedAtIndex)
+                    } else {
+                        null
+                    }
                 )
             }
         }
@@ -208,7 +295,7 @@ class NoteDatabaseHelper(context: Context) :
 
     companion object {
         private const val DATABASE_NAME = "notes.db"
-        private const val DATABASE_VERSION = 3
+        private const val DATABASE_VERSION = 4
 
         private const val TABLE_NOTES = "notes"
         private const val TABLE_NOTE_IMAGES = "note_images"
@@ -219,6 +306,8 @@ class NoteDatabaseHelper(context: Context) :
         private const val COL_TAGS = "tags"
         private const val COL_IMAGE_LAYOUT_MODE = "image_layout_mode"
         private const val COL_UPDATED_AT = "updated_at"
+        private const val COL_IS_DELETED = "is_deleted"
+        private const val COL_DELETED_AT = "deleted_at"
 
         private const val COL_IMAGE_ID = "id"
         private const val COL_IMAGE_NOTE_ID = "note_id"

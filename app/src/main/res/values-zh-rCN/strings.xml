@@ -2,6 +2,7 @@
     <string name="app_name">随手记</string>
     <string name="header_title">随手记</string>
     <string name="header_subtitle">随时记录 · 相册与拍照 · #标签搜索</string>
+    <string name="header_subtitle_recycle_bin">回收站 · 可恢复或彻底删除笔记</string>
     <string name="label_app_theme">应用主题</string>
     <string name="app_theme_follow_system">跟随系统</string>
     <string name="app_theme_black">黑色</string>
@@ -61,7 +62,18 @@
     <string name="btn_edit">编辑</string>
     <string name="cd_delete">删除</string>
     <string name="btn_delete">删除</string>
+    <string name="btn_restore">恢复</string>
+    <string name="btn_delete_forever">彻底删除</string>
+    <string name="btn_move_to_bin">移入回收站</string>
+    <string name="delete_confirm_title">确认删除</string>
+    <string name="delete_confirm_move_to_bin_message">该笔记将移入回收站。</string>
+    <string name="delete_confirm_permanent_message">该笔记将被彻底删除且无法恢复。</string>
+    <string name="cd_recycle_bin">打开回收站</string>
+    <string name="cd_close_recycle_bin">关闭回收站</string>
     <string name="cd_close">关闭</string>
+
+    <string name="empty_recycle_bin_title">回收站为空</string>
+    <string name="empty_recycle_bin_hint">删除的笔记会显示在这里，你可以恢复或彻底删除。</string>
 
     <string name="cd_share_pdf">分享PDF</string>
     <string name="btn_share_pdf">分享PDF</string>

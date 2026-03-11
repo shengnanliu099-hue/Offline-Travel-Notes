@@ -45,6 +45,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     var selectedImageLayoutMode by mutableStateOf(ImageLayoutMode.AUTO)
         private set
 
+    var isRecycleBinVisible by mutableStateOf(false)
+        private set
+
     var editingNoteId by mutableStateOf<Long?>(null)
         private set
 
@@ -72,8 +75,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun startCreate() {
+        if (isRecycleBinVisible) {
+            isRecycleBinVisible = false
+        }
         clearEditor()
         isComposerVisible = true
+        refreshNotes()
     }
 
     fun addPickedImages(uris: List<Uri>) {
@@ -174,6 +181,35 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         refreshNotes()
     }
 
+    fun restoreNote(note: Note) {
+        repository.restoreNote(note)
+        if (editingNoteId == note.id) {
+            clearEditor()
+            isComposerVisible = false
+        }
+        refreshNotes()
+    }
+
+    fun deleteNotePermanently(note: Note) {
+        repository.deleteNotePermanently(note)
+        if (editingNoteId == note.id) {
+            clearEditor()
+            isComposerVisible = false
+        }
+        refreshNotes()
+    }
+
+    fun showRecycleBin(visible: Boolean) {
+        if (isRecycleBinVisible == visible) return
+        isRecycleBinVisible = visible
+        refreshNotes()
+    }
+
+    fun toggleRecycleBin() {
+        isRecycleBinVisible = !isRecycleBinVisible
+        refreshNotes()
+    }
+
     private fun clearEditor() {
         editingNoteId = null
         titleInput = ""
@@ -183,7 +219,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     private fun refreshNotes() {
-        notes = repository.getNotes(searchInput)
+        notes = repository.getNotes(
+            searchQuery = searchInput,
+            inRecycleBin = isRecycleBinVisible
+        )
     }
 
     private fun nextDraftImageId(prefix: String): String {
