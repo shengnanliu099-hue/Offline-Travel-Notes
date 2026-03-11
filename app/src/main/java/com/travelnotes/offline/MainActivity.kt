@@ -20,6 +20,7 @@ import android.os.Environment
 import android.provider.MediaStore
 import android.widget.Toast
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -39,8 +40,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.gestures.calculateZoom
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
-import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.aspectRatio
@@ -246,6 +247,32 @@ private fun TravelNotesScreen(viewModel: MainViewModel = viewModel()) {
 
     var openedNoteId by remember { mutableStateOf<Long?>(null) }
     val openedNote = viewModel.notes.firstOrNull { it.id == openedNoteId }
+
+    val hasOverlayToClose = imageViewerPaths.isNotEmpty() ||
+        capturedPreviewUri != null ||
+        noteForPdfShare != null ||
+        viewModel.isComposerVisible ||
+        openedNoteId != null
+    BackHandler(enabled = hasOverlayToClose) {
+        when {
+            imageViewerPaths.isNotEmpty() -> {
+                imageViewerPaths = emptyList()
+                imageViewerInitialIndex = 0
+            }
+            capturedPreviewUri != null -> {
+                capturedPreviewFile?.let(::deleteLocalFile)
+                capturedPreviewFile = null
+                capturedPreviewUri = null
+            }
+            noteForPdfShare != null -> {
+                if (!isSharingPdf) {
+                    noteForPdfShare = null
+                }
+            }
+            viewModel.isComposerVisible -> viewModel.cancelEdit()
+            openedNoteId != null -> openedNoteId = null
+        }
+    }
 
     Box(
         modifier = Modifier
@@ -1093,40 +1120,33 @@ private fun NoteImageViewerOverlay(
 @Composable
 private fun ZoomableViewerImage(path: String, modifier: Modifier = Modifier) {
     val file = remember(path) { File(path) }
-    var rawScale by remember(path) { mutableFloatStateOf(1f) }
-    var offsetX by remember(path) { mutableFloatStateOf(0f) }
-    var offsetY by remember(path) { mutableFloatStateOf(0f) }
-
-    val displayScale by animateFloatAsState(
-        targetValue = when {
-            rawScale < 0.85f -> 1f
-            rawScale < 1f -> rawScale
-            else -> rawScale.coerceIn(1f, 5f)
-        },
-        animationSpec = tween(durationMillis = 170),
-        label = "viewerScale"
-    )
-
-    LaunchedEffect(displayScale) {
-        if (displayScale <= 1.02f && (offsetX != 0f || offsetY != 0f)) {
-            offsetX = 0f
-            offsetY = 0f
-        }
-    }
+    var scale by remember(path) { mutableFloatStateOf(1f) }
 
     Box(
         modifier = modifier
             .background(Color.Black)
             .pointerInput(path) {
-                detectTransformGestures { _, pan, zoom, _ ->
-                    val nextScale = (rawScale * zoom).coerceIn(0.65f, 5f)
-                    rawScale = nextScale
-                    if (nextScale > 1f) {
-                        offsetX += pan.x
-                        offsetY += pan.y
-                    } else {
-                        offsetX = 0f
-                        offsetY = 0f
+                while (true) {
+                    awaitPointerEventScope {
+                        var handledMultiTouch = false
+                        while (true) {
+                            val event = awaitPointerEvent()
+                            val pressedCount = event.changes.count { it.pressed }
+                            if (pressedCount >= 2) {
+                                handledMultiTouch = true
+                                val zoomChange = event.calculateZoom()
+                                if (zoomChange.isFinite() && zoomChange > 0f) {
+                                    scale = (scale * zoomChange).coerceIn(0.05f, 8f)
+                                }
+                                event.changes.forEach { change ->
+                                    change.consume()
+                                }
+                            }
+                            if (event.changes.none { it.pressed }) break
+                        }
+                        if (handledMultiTouch && scale < 1f) {
+                            scale = 1f
+                        }
                     }
                 }
             },
@@ -1139,10 +1159,8 @@ private fun ZoomableViewerImage(path: String, modifier: Modifier = Modifier) {
                 modifier = Modifier
                     .fillMaxSize()
                     .graphicsLayer {
-                        scaleX = displayScale
-                        scaleY = displayScale
-                        translationX = offsetX
-                        translationY = offsetY
+                        scaleX = scale
+                        scaleY = scale
                     },
                 contentScale = ContentScale.Fit
             )
