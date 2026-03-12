@@ -1,0 +1,102 @@
+<resources>
+    <string name="app_name">Notizen Jederzeit</string>
+    <string name="header_title">Notizen Jederzeit</string>
+    <string name="header_subtitle">Offline-Tagebuch · Fotos &amp; Kamera · #Tag-Suche</string>
+    <string name="header_subtitle_recycle_bin">Papierkorb · Notizen wiederherstellen oder endgültig löschen</string>
+    <string name="label_app_theme">App-Design</string>
+    <string name="app_theme_follow_system">System folgen</string>
+    <string name="app_theme_black">Schwarz</string>
+    <string name="app_theme_white">Weiß</string>
+    <string name="search_hint">Nach #Tag oder Stichwort suchen</string>
+    <string name="cd_search">Suchen</string>
+    <string name="cd_add_note">Notiz erstellen</string>
+    <string name="cd_settings">Einstellungen</string>
+    <string name="settings_title">Einstellungen</string>
+    <string name="btn_done">Fertig</string>
+
+    <string name="editor_new_title">Neue Notiz</string>
+    <string name="editor_editing_title">Notiz bearbeiten</string>
+    <string name="editor_editing_notice">Du bearbeitest eine vorhandene Notiz</string>
+    <string name="btn_focus_mode_on">Fokus</string>
+    <string name="btn_focus_mode_off">Fokus beenden</string>
+    <string name="hint_focus_mode">Im Fokusmodus ist nur der Schreibbereich sichtbar.</string>
+    <string name="overlay_create_title">Notiz erstellen</string>
+    <string name="overlay_edit_title">Notiz bearbeiten</string>
+    <string name="label_title">Titel</string>
+    <string name="label_content_with_hint">Inhalt (Beispiel: #reise #tokio)</string>
+    <string name="hint_drag_to_sort">Bilder lange drücken und ziehen, um sie zu sortieren</string>
+    <string name="label_image_layout_mode">Bildlayout</string>
+    <string name="hint_image_layout_mode">Standard ist Auto. Du kannst das Layout pro Notiz ändern.</string>
+    <string name="layout_mode_auto">Auto</string>
+    <string name="layout_mode_small">Kleines Raster</string>
+    <string name="layout_mode_two_columns">2 Spalten</string>
+    <string name="layout_mode_large_single">Ein großes Bild</string>
+    <string name="layout_mode_large_first">Erstes Bild groß</string>
+    <string name="layout_mode_large_last">Letztes Bild groß</string>
+    <string name="hint_tap_to_open">Zum Öffnen tippen</string>
+    <string name="empty_notes_title">Noch keine Notizen</string>
+    <string name="empty_notes_hint">Tippe unten rechts auf +, um deine erste Notiz zu erstellen.</string>
+
+    <string name="cd_pick_photos">Fotos auswählen</string>
+    <string name="btn_add_photos">Fotos hinzufügen</string>
+    <string name="cd_take_photo">Foto aufnehmen</string>
+    <string name="btn_take_photo">Foto aufnehmen</string>
+    <string name="camera_capture_preview_title">Dieses Foto verwenden?</string>
+    <string name="btn_use_photo">Foto verwenden</string>
+    <string name="btn_processing">Wird verarbeitet...</string>
+    <string name="btn_discard_photo">Verwerfen</string>
+    <string name="msg_camera_unavailable">Die Kamera ist momentan nicht verfügbar.</string>
+    <string name="msg_camera_save_failed">Foto konnte nicht im Systemalbum gespeichert werden. Bitte erneut versuchen.</string>
+
+    <string name="btn_cancel">Abbrechen</string>
+    <string name="cd_save">Speichern</string>
+    <string name="btn_save">Speichern</string>
+    <string name="btn_update">Aktualisieren</string>
+
+    <string name="cd_draft_image">Entwurfsbild</string>
+    <string name="cd_remove_image">Bild entfernen</string>
+    <string name="untitled_note">Unbenannte Notiz</string>
+    <string name="cd_note_photo">Notizbild</string>
+
+    <string name="cd_edit">Bearbeiten</string>
+    <string name="btn_edit">Bearbeiten</string>
+    <string name="cd_delete">Löschen</string>
+    <string name="btn_delete">Löschen</string>
+    <string name="btn_restore">Wiederherstellen</string>
+    <string name="btn_delete_forever">Endgültig löschen</string>
+    <string name="btn_move_to_bin">In den Papierkorb verschieben</string>
+    <string name="delete_confirm_title">Löschen bestätigen</string>
+    <string name="delete_confirm_move_to_bin_message">Diese Notiz wird in den Papierkorb verschoben.</string>
+    <string name="delete_confirm_permanent_message">Diese Notiz wird endgültig gelöscht und kann nicht wiederhergestellt werden.</string>
+    <string name="cd_recycle_bin">Papierkorb öffnen</string>
+    <string name="cd_close_recycle_bin">Papierkorb schließen</string>
+    <string name="cd_close">Schließen</string>
+
+    <string name="empty_recycle_bin_title">Papierkorb ist leer</string>
+    <string name="empty_recycle_bin_hint">Gelöschte Notizen erscheinen hier. Du kannst sie wiederherstellen oder endgültig löschen.</string>
+
+    <string name="cd_share_pdf">PDF teilen</string>
+    <string name="btn_share_pdf">PDF teilen</string>
+    <string name="share_pdf_title">Diese Notiz als PDF teilen</string>
+    <string name="btn_share_pdf_with_watermark">PDF teilen (mit Wasserzeichen)</string>
+    <string name="btn_share_pdf_without_watermark">PDF teilen (ohne Wasserzeichen)</string>
+    <string name="btn_share_pdf_generate">PDF erstellen &amp; teilen</string>
+    <string name="label_pdf_paper_size">Papiermodus</string>
+    <string name="pdf_paper_auto">Auto</string>
+    <string name="pdf_paper_small">Kleine Karte</string>
+    <string name="pdf_paper_medium">Mittlere Karte</string>
+    <string name="pdf_paper_large">Große Karte</string>
+    <string name="label_pdf_quality">Exportqualität</string>
+    <string name="pdf_quality_standard">Standard</string>
+    <string name="pdf_quality_ultra">Ultra HD</string>
+    <string name="label_pdf_style">PDF-Design</string>
+    <string name="pdf_style_follow_app">App-Design folgen</string>
+    <string name="pdf_style_black_theme">Schwarzes Design</string>
+    <string name="pdf_style_white_theme">Weißes Design</string>
+    <string name="label_pdf_watermark">Wasserzeichen (mit App-Name)</string>
+    <string name="pdf_watermark_on">Ein</string>
+    <string name="pdf_watermark_off">Aus</string>
+    <string name="share_pdf_chooser_title">Notiz-PDF teilen</string>
+    <string name="msg_share_pdf_failed">PDF konnte nicht erstellt werden. Bitte erneut versuchen.</string>
+    <string name="pdf_watermark_text">Mache jederzeit Notizen, um dein Leben festzuhalten, egal ob gut oder schlecht :)</string>
+</resources>
