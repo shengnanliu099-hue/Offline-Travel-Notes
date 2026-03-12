@@ -120,6 +120,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
@@ -384,11 +385,6 @@ private fun TravelNotesScreen(
                 item {
                     HeaderSection(
                         isDarkMode = isDarkMode,
-                        isRecycleBinVisible = viewModel.isRecycleBinVisible,
-                        onToggleRecycleBin = {
-                            openedNoteId = null
-                            viewModel.toggleRecycleBin()
-                        },
                         onOpenSettings = { isSettingsVisible = true }
                     )
                 }
@@ -597,8 +593,13 @@ private fun TravelNotesScreen(
         SettingsOverlay(
             visible = isSettingsVisible,
             isDarkMode = isDarkMode,
+            isRecycleBinVisible = viewModel.isRecycleBinVisible,
             themeMode = themeMode,
             onThemeModeChange = onThemeModeChange,
+            onToggleRecycleBin = {
+                openedNoteId = null
+                viewModel.toggleRecycleBin()
+            },
             onDismiss = { isSettingsVisible = false }
         )
 
@@ -663,10 +664,17 @@ private fun TravelNotesScreen(
 @Composable
 private fun HeaderSection(
     isDarkMode: Boolean,
-    isRecycleBinVisible: Boolean,
-    onToggleRecycleBin: () -> Unit,
     onOpenSettings: () -> Unit
 ) {
+    val screenWidthDp = LocalConfiguration.current.screenWidthDp
+    val showSubtitle = screenWidthDp >= 380
+    val headerTitle = stringResource(R.string.header_title)
+    val titleStyle = if (headerTitle.length > 12) {
+        MaterialTheme.typography.titleLarge
+    } else {
+        MaterialTheme.typography.headlineSmall
+    }
+
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -689,51 +697,38 @@ private fun HeaderSection(
     ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
-                text = stringResource(R.string.header_title),
-                style = MaterialTheme.typography.headlineMedium,
+                text = headerTitle,
+                style = titleStyle,
                 color = if (isDarkMode) Color.White else Color(0xFF111317),
                 fontWeight = FontWeight.ExtraBold,
-                letterSpacing = 0.4.sp
+                letterSpacing = 0.2.sp,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(end = 8.dp)
             )
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                IconButton(onClick = onToggleRecycleBin) {
-                    Icon(
-                        imageVector = if (isRecycleBinVisible) Icons.Default.Close else Icons.Default.DeleteOutline,
-                        contentDescription = if (isRecycleBinVisible) {
-                            stringResource(R.string.cd_close_recycle_bin)
-                        } else {
-                            stringResource(R.string.cd_recycle_bin)
-                        },
-                        tint = if (isRecycleBinVisible) {
-                            if (isDarkMode) Color(0xFFFFA3A3) else Color(0xFFC23A3A)
-                        } else {
-                            if (isDarkMode) Color(0xFFD9E2EE) else Color(0xFF2D3A4B)
-                        }
-                    )
-                }
-                IconButton(onClick = onOpenSettings) {
-                    Icon(
-                        imageVector = Icons.Default.Settings,
-                        contentDescription = stringResource(R.string.cd_settings),
-                        tint = if (isDarkMode) Color(0xFFD9E2EE) else Color(0xFF2D3A4B)
-                    )
-                }
+            IconButton(onClick = onOpenSettings, modifier = Modifier.size(40.dp)) {
+                Icon(
+                    imageVector = Icons.Default.Settings,
+                    contentDescription = stringResource(R.string.cd_settings),
+                    tint = if (isDarkMode) Color(0xFFD9E2EE) else Color(0xFF2D3A4B)
+                )
             }
         }
-        Text(
-            text = if (isRecycleBinVisible) {
-                stringResource(R.string.header_subtitle_recycle_bin)
-            } else {
-                stringResource(R.string.header_subtitle)
-            },
-            style = MaterialTheme.typography.bodyMedium,
-            color = if (isDarkMode) Color(0xFF9DA4AE) else Color(0xFF495060),
-            modifier = Modifier.padding(top = 4.dp)
-        )
+        if (showSubtitle) {
+            Text(
+                text = stringResource(R.string.header_subtitle),
+                style = MaterialTheme.typography.bodyMedium,
+                color = if (isDarkMode) Color(0xFF9DA4AE) else Color(0xFF495060),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.padding(top = 4.dp)
+            )
+        }
     }
 }
 
@@ -785,8 +780,10 @@ private fun EmptyStateCard(
 private fun SettingsOverlay(
     visible: Boolean,
     isDarkMode: Boolean,
+    isRecycleBinVisible: Boolean,
     themeMode: AppThemeMode,
     onThemeModeChange: (AppThemeMode) -> Unit,
+    onToggleRecycleBin: () -> Unit,
     onDismiss: () -> Unit
 ) {
     if (!visible) return
@@ -851,6 +848,32 @@ private fun SettingsOverlay(
                             )
                         }
                     }
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Text(
+                        text = stringResource(R.string.label_recycle_bin),
+                        color = if (isDarkMode) Color(0xFFD8DEE8) else Color(0xFF394457),
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    FilterChip(
+                        selected = isRecycleBinVisible,
+                        onClick = onToggleRecycleBin,
+                        label = {
+                            Text(
+                                text = if (isRecycleBinVisible) {
+                                    stringResource(R.string.btn_close_recycle_bin)
+                                } else {
+                                    stringResource(R.string.btn_open_recycle_bin)
+                                }
+                            )
+                        },
+                        colors = FilterChipDefaults.filterChipColors(
+                            selectedContainerColor = if (isDarkMode) Color(0xFFDAEDFF) else Color(0xFF1D2735),
+                            selectedLabelColor = if (isDarkMode) Color.Black else Color.White,
+                            containerColor = if (isDarkMode) Color(0xFF2B3038) else Color(0xFFE0E6F0),
+                            labelColor = if (isDarkMode) Color(0xFFD5DDE9) else Color(0xFF2A3442)
+                        )
+                    )
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.End
